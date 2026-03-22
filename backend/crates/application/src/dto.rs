@@ -60,6 +60,47 @@ pub struct CameraResponse {
     pub updated_at: DateTime<Utc>,
 }
 
+impl CreateCameraRequest {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.name.trim().is_empty() || self.name.len() > 255 {
+            return Err("Camera name must be 1-255 characters".into());
+        }
+        if self.stream_url.trim().is_empty() || self.stream_url.len() > 2048 {
+            return Err("Stream URL must be 1-2048 characters".into());
+        }
+        // Prevent SSRF - only allow known protocols
+        let valid_schemes = ["rtsp://", "rtsps://", "http://", "https://", "rtmp://"];
+        if !valid_schemes.iter().any(|s| self.stream_url.starts_with(s)) {
+            return Err("Stream URL must start with rtsp://, rtsps://, http://, https://, or rtmp://".into());
+        }
+        // Prevent internal network scanning via stream URL
+        if self.stream_url.contains("localhost") || self.stream_url.contains("127.0.0.1") || self.stream_url.contains("0.0.0.0") {
+            return Err("Stream URL cannot point to localhost".into());
+        }
+        if let Some(ref url) = self.onvif_url {
+            if url.len() > 2048 {
+                return Err("ONVIF URL too long".into());
+            }
+        }
+        if let Some(ref brand) = self.brand {
+            if brand.len() > 100 {
+                return Err("Brand must be under 100 characters".into());
+            }
+        }
+        if let Some(ref user) = self.username {
+            if user.len() > 255 {
+                return Err("Username too long".into());
+            }
+        }
+        if let Some(ref pass) = self.password {
+            if pass.len() > 255 {
+                return Err("Password too long".into());
+            }
+        }
+        Ok(())
+    }
+}
+
 impl From<Camera> for CameraResponse {
     fn from(c: Camera) -> Self {
         Self {
@@ -97,6 +138,20 @@ pub struct GroupResponse {
     pub name: String,
     pub description: Option<String>,
     pub created_at: DateTime<Utc>,
+}
+
+impl CreateGroupRequest {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.name.trim().is_empty() || self.name.len() > 255 {
+            return Err("Group name must be 1-255 characters".into());
+        }
+        if let Some(ref desc) = self.description {
+            if desc.len() > 1000 {
+                return Err("Description must be under 1000 characters".into());
+            }
+        }
+        Ok(())
+    }
 }
 
 impl From<CameraGroup> for GroupResponse {
@@ -176,6 +231,31 @@ impl From<NetworkEvent> for NetworkEventResponse {
 pub struct ScanNetworkRequest {
     pub subnets: Option<Vec<String>>,
     pub timeout_secs: Option<u64>,
+}
+
+impl ScanNetworkRequest {
+    pub fn validate(&self) -> Result<(), String> {
+        if let Some(ref subnets) = self.subnets {
+            if subnets.len() > 10 {
+                return Err("Maximum 10 subnets per scan".into());
+            }
+            for subnet in subnets {
+                if subnet.len() > 50 {
+                    return Err("Subnet too long".into());
+                }
+                // Basic CIDR validation
+                if !subnet.contains('/') {
+                    return Err(format!("Invalid CIDR notation: {}", subnet));
+                }
+            }
+        }
+        if let Some(timeout) = self.timeout_secs {
+            if timeout > 120 {
+                return Err("Timeout must be 120 seconds or less".into());
+            }
+        }
+        Ok(())
+    }
 }
 
 // === Storage DTOs ===

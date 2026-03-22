@@ -1,8 +1,12 @@
 mod camera;
+mod events;
 mod group;
 mod health;
 mod audit;
 mod storage;
+mod recording;
+mod timeline;
+mod zones;
 
 use axum::routing::get;
 use axum::Router;
@@ -25,4 +29,8 @@ fn api_routes(state: AppState) -> Router {
         .merge(group::routes(state.clone()))
         .merge(audit::routes(state.clone()))
         .merge(storage::routes())
+        .merge(recording::routes(state.clone()))
+        .merge(timeline::routes(state.clone()))
+        .merge(zones::routes(state.clone()))
+        .merge(events::routes(state.clone()))
 }

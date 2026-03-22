@@ -25,6 +25,8 @@ impl CameraCommandService {
         user_id: &str,
         user_email: Option<&str>,
     ) -> Result<Camera, DomainError> {
+        req.validate().map_err(DomainError::Validation)?;
+
         let protocol = req.protocol_type.parse::<ProtocolType>()
             .map_err(|e| DomainError::Validation(e))?;
 

@@ -1,3 +1,4 @@
+pub mod detection;
 pub mod persistence;
 pub mod logging;
 pub mod protocols;

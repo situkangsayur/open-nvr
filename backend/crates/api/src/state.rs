@@ -12,8 +12,12 @@ pub struct AppState {
     pub camera_commands: Arc<CameraCommandService>,
     pub camera_queries: Arc<CameraQueryService>,
     pub group_commands: Arc<GroupCommandService>,
+    pub recording_queries: Arc<RecordingQueryService>,
+    pub timeline_queries: Arc<TimelineQueryService>,
     pub audit_repo: Arc<PgAuditRepository>,
     pub network_event_repo: Arc<PgNetworkEventRepository>,
+    pub zone_repo: Arc<dyn DetectionZoneRepository>,
+    pub event_repo: Arc<dyn DetectionEventRepository>,
     pub db_pool: PgPool,
     pub live_tx: broadcast::Sender<LiveFrame>,
 }
@@ -24,6 +28,10 @@ impl AppState {
         let group_repo = Arc::new(PgCameraGroupRepository::new(pool.clone()));
         let audit_repo = Arc::new(PgAuditRepository::new(pool.clone()));
         let network_event_repo = Arc::new(PgNetworkEventRepository::new(pool.clone()));
+        let recording_repo = Arc::new(PgRecordingRepository::new(pool.clone()));
+        let segment_repo = Arc::new(PgRecordingSegmentRepository::new(pool.clone()));
+        let event_repo = Arc::new(PgDetectionEventRepository::new(pool.clone()));
+        let zone_repo = Arc::new(PgDetectionZoneRepository::new(pool.clone()));
 
         let camera_commands = Arc::new(CameraCommandService::new(
             camera_repo.clone() as Arc<dyn CameraRepository>,
@@ -39,14 +47,29 @@ impl AppState {
             audit_repo.clone() as Arc<dyn AuditRepository>,
         ));
 
+        let recording_queries = Arc::new(RecordingQueryService::new(
+            recording_repo.clone() as Arc<dyn RecordingRepository>,
+            segment_repo as Arc<dyn RecordingSegmentRepository>,
+            None, // ObjectStorage will be connected when MinIO is configured
+        ));
+
+        let timeline_queries = Arc::new(TimelineQueryService::new(
+            recording_repo as Arc<dyn RecordingRepository>,
+            event_repo.clone() as Arc<dyn DetectionEventRepository>,
+        ));
+
         let (live_tx, _) = broadcast::channel(1024);
 
         Self {
             camera_commands,
             camera_queries,
             group_commands,
+            recording_queries,
+            timeline_queries,
             audit_repo,
             network_event_repo,
+            zone_repo: zone_repo as Arc<dyn DetectionZoneRepository>,
+            event_repo: event_repo as Arc<dyn DetectionEventRepository>,
             db_pool: pool,
             live_tx,
         }

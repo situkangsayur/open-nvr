@@ -23,6 +23,8 @@ impl GroupCommandService {
         req: CreateGroupRequest,
         user_id: &str,
     ) -> Result<CameraGroup, DomainError> {
+        req.validate().map_err(DomainError::Validation)?;
+
         let group = CameraGroup::new(req.name, req.description);
         self.group_repo.create(&group).await?;
 

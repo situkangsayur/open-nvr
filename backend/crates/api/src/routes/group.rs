@@ -1,5 +1,5 @@
 use axum::extract::{Path, State};
-use axum::routing::{get, post};
+use axum::routing::get;
 use axum::{Json, Router};
 use open_nvr_application::dto::*;
 use open_nvr_domain::ports::CameraGroupRepository;
