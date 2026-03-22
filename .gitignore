@@ -1,0 +1,106 @@
+# =========================
+# Rust
+# =========================
+/target/
+**/target/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+# Keep workspace Cargo.lock (uncomment next line if using workspace)
+# !Cargo.lock
+
+# =========================
+# Node.js / Nuxt / Frontend
+# =========================
+node_modules/
+.nuxt/
+.output/
+dist/
+*.local
+.nitro/
+.cache/
+.pnpm-store/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# =========================
+# Environment & Secrets
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# Docker
+# =========================
+docker-compose.override.yml
+.docker-data/
+docker-data/
+
+# =========================
+# AI / ML Models
+# =========================
+*.onnx
+*.pt
+*.pth
+*.bin
+*.safetensors
+!ai-models/models/.gitkeep
+
+# =========================
+# IDE & Editors
+# =========================
+# VSCode
+.vscode/
+*.code-workspace
+
+# JetBrains (CLion, IntelliJ, RustRover)
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Vim / Neovim
+*.swp
+*.swo
+*~
+tags
+
+# Emacs
+\#*\#
+.\#*
+
+# =========================
+# OS Files
+# =========================
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# =========================
+# Logs & Debug
+# =========================
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =========================
+# Coverage & Testing
+# =========================
+coverage/
+*.lcov
+tarpaulin-report.html
+cobertura.xml
+
+# =========================
+# Build Artifacts
+# =========================
+*.o
+*.so
+*.dylib
+*.dll
