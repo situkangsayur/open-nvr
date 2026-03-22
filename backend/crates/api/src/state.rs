@@ -2,8 +2,10 @@ use open_nvr_application::commands::*;
 use open_nvr_application::queries::*;
 use open_nvr_domain::ports::*;
 use open_nvr_infrastructure::persistence::*;
+use open_nvr_worker::recording::LiveFrame;
 use sqlx::PgPool;
 use std::sync::Arc;
+use tokio::sync::broadcast;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -13,6 +15,7 @@ pub struct AppState {
     pub audit_repo: Arc<PgAuditRepository>,
     pub network_event_repo: Arc<PgNetworkEventRepository>,
     pub db_pool: PgPool,
+    pub live_tx: broadcast::Sender<LiveFrame>,
 }
 
 impl AppState {
@@ -36,6 +39,8 @@ impl AppState {
             audit_repo.clone() as Arc<dyn AuditRepository>,
         ));
 
+        let (live_tx, _) = broadcast::channel(1024);
+
         Self {
             camera_commands,
             camera_queries,
@@ -43,6 +48,7 @@ impl AppState {
             audit_repo,
             network_event_repo,
             db_pool: pool,
+            live_tx,
         }
     }
 }

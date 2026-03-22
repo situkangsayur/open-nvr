@@ -1,7 +1,7 @@
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
-use std::path::Path;
-use tracing::info;
+use std::path::PathBuf;
+use tracing::{info, warn};
 
 pub async fn create_pool(database_url: &str) -> Result<PgPool, sqlx::Error> {
     let pool = PgPoolOptions::new()
@@ -14,12 +14,23 @@ pub async fn create_pool(database_url: &str) -> Result<PgPool, sqlx::Error> {
 }
 
 pub async fn run_migrations(pool: &PgPool) -> Result<(), Box<dyn std::error::Error>> {
-    let migrations_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../migrations");
+    let possible_paths: Vec<PathBuf> = vec![
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../migrations"),
+        PathBuf::from("./migrations"),
+        PathBuf::from("../migrations"),
+    ];
 
-    let migrator = sqlx::migrate::Migrator::new(migrations_dir).await?;
-    migrator.run(pool).await?;
+    for path in &possible_paths {
+        if path.exists() {
+            let canonical = path.canonicalize()?;
+            info!(path = %canonical.display(), "Running migrations");
+            let migrator: sqlx::migrate::Migrator = sqlx::migrate::Migrator::new(canonical).await?;
+            migrator.run(pool).await?;
+            info!("Database migrations applied");
+            return Ok(());
+        }
+    }
 
-    info!("Database migrations applied");
+    warn!("No migrations directory found, skipping migrations");
     Ok(())
 }

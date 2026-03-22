@@ -15,3 +15,15 @@ async-trait = { workspace = true }
 tracing = { workspace = true }
 sqlx = { workspace = true }
 tokio = { workspace = true }
+opensearch = { version = "2", optional = true }
+reqwest = { version = "0.12", features = ["json"], optional = true }
+retina = "0.4"
+rust-s3 = { version = "0.35", default-features = false, features = ["tokio-rustls-tls"] }
+bytes = { workspace = true }
+tokio-stream = "0.1"
+url = "2"
+futures-util = "0.3"
+
+[features]
+default = []
+opensearch = ["dep:opensearch", "dep:reqwest"]
