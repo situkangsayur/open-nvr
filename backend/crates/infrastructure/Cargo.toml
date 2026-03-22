@@ -1,0 +1,17 @@
+[package]
+name = "open-nvr-infrastructure"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+open-nvr-domain = { path = "../domain" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+tracing = { workspace = true }
+sqlx = { workspace = true }
+tokio = { workspace = true }

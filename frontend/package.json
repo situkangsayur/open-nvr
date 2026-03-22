@@ -1,0 +1,27 @@
+{
+  "name": "open-nvr-frontend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "nuxt": "^3.21.2",
+    "vue": "^3.5.30",
+    "vue-router": "^5.0.3",
+    "@pinia/nuxt": "^0.9",
+    "pinia": "^3",
+    "oidc-client-ts": "^3.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7",
+    "@nuxtjs/tailwindcss": "^6.13",
+    "tailwindcss": "^3.4",
+    "autoprefixer": "^10.4",
+    "postcss": "^8.4"
+  }
+}
