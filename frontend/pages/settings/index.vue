@@ -14,6 +14,10 @@
         <h2 class="text-lg font-semibold mb-2">Notifications & Alerts</h2>
         <p class="text-sm text-gray-500 dark:text-gray-400">Configure alert rules, notification channels, and alarm triggers</p>
       </NuxtLink>
+      <NuxtLink to="/settings/profile" class="bg-white dark:bg-nvr-card rounded-lg p-6 border border-gray-200 dark:border-nvr-border hover:border-primary-500 transition-colors">
+        <h2 class="text-lg font-semibold mb-2">Profile & Password</h2>
+        <p class="text-sm text-gray-500 dark:text-gray-400">View your profile and change your password</p>
+      </NuxtLink>
     </div>
   </div>
 </template>
