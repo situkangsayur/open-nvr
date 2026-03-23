@@ -3,7 +3,7 @@
 -- Database: PostgreSQL 16
 -- Created: 2026-03-22
 
-BEGIN;
+-- Idempotent: safe to re-run
 
 -- =============================================================================
 -- Trigger function: auto-update updated_at on row change
@@ -19,7 +19,7 @@ $$ LANGUAGE plpgsql;
 -- =============================================================================
 -- Table: camera_groups
 -- =============================================================================
-CREATE TABLE camera_groups (
+CREATE TABLE IF NOT EXISTScamera_groups (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name        VARCHAR(255) NOT NULL,
     description TEXT,
@@ -30,6 +30,7 @@ CREATE TABLE camera_groups (
 COMMENT ON TABLE camera_groups IS
     'Logical groupings of cameras for organisation and bulk operations.';
 
+DROP TRIGGER IF EXISTS trg_camera_groups_updated_at ON camera_groups;
 CREATE TRIGGER trg_camera_groups_updated_at
     BEFORE UPDATE ON camera_groups
     FOR EACH ROW
@@ -38,7 +39,7 @@ CREATE TRIGGER trg_camera_groups_updated_at
 -- =============================================================================
 -- Table: cameras
 -- =============================================================================
-CREATE TABLE cameras (
+CREATE TABLE IF NOT EXISTScameras (
     id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name                  VARCHAR(255) NOT NULL,
     brand                 VARCHAR(100),
@@ -66,6 +67,7 @@ CREATE TABLE cameras (
 COMMENT ON TABLE cameras IS
     'Registered IP cameras and their connection/configuration details.';
 
+DROP TRIGGER IF EXISTS trg_cameras_updated_at ON cameras;
 CREATE TRIGGER trg_cameras_updated_at
     BEFORE UPDATE ON cameras
     FOR EACH ROW
@@ -74,7 +76,7 @@ CREATE TRIGGER trg_cameras_updated_at
 -- =============================================================================
 -- Table: detection_zones
 -- =============================================================================
-CREATE TABLE detection_zones (
+CREATE TABLE IF NOT EXISTSdetection_zones (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     camera_id       UUID         NOT NULL REFERENCES cameras (id) ON DELETE CASCADE,
     name            VARCHAR(255) NOT NULL,
@@ -90,6 +92,7 @@ CREATE TABLE detection_zones (
 COMMENT ON TABLE detection_zones IS
     'User-defined polygonal zones within a camera view used for targeted detection.';
 
+DROP TRIGGER IF EXISTS trg_detection_zones_updated_at ON detection_zones;
 CREATE TRIGGER trg_detection_zones_updated_at
     BEFORE UPDATE ON detection_zones
     FOR EACH ROW
@@ -98,7 +101,7 @@ CREATE TRIGGER trg_detection_zones_updated_at
 -- =============================================================================
 -- Table: recordings
 -- =============================================================================
-CREATE TABLE recordings (
+CREATE TABLE IF NOT EXISTSrecordings (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     camera_id       UUID         NOT NULL REFERENCES cameras (id) ON DELETE CASCADE,
     start_time      TIMESTAMPTZ  NOT NULL,
@@ -115,13 +118,13 @@ CREATE TABLE recordings (
 COMMENT ON TABLE recordings IS
     'Top-level recording sessions linked to a camera, spanning one or more segments.';
 
-CREATE INDEX idx_recordings_camera_start
+CREATE INDEX IF NOT EXISTSidx_recordings_camera_start
     ON recordings (camera_id, start_time);
 
 -- =============================================================================
 -- Table: recording_segments
 -- =============================================================================
-CREATE TABLE recording_segments (
+CREATE TABLE IF NOT EXISTSrecording_segments (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     recording_id     UUID         NOT NULL REFERENCES recordings (id) ON DELETE CASCADE,
     sequence_number  INT          NOT NULL,
@@ -136,13 +139,13 @@ CREATE TABLE recording_segments (
 COMMENT ON TABLE recording_segments IS
     'Individual file segments that compose a recording, stored by storage_key.';
 
-CREATE INDEX idx_recording_segments_recording_seq
+CREATE INDEX IF NOT EXISTSidx_recording_segments_recording_seq
     ON recording_segments (recording_id, sequence_number);
 
 -- =============================================================================
 -- Table: detection_events
 -- =============================================================================
-CREATE TABLE detection_events (
+CREATE TABLE IF NOT EXISTSdetection_events (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     camera_id     UUID         NOT NULL REFERENCES cameras (id) ON DELETE CASCADE,
     zone_id       UUID         REFERENCES detection_zones (id) ON DELETE SET NULL,
@@ -160,16 +163,16 @@ CREATE TABLE detection_events (
 COMMENT ON TABLE detection_events IS
     'Detected events (motion, object recognition) captured within camera views.';
 
-CREATE INDEX idx_detection_events_camera_occurred
+CREATE INDEX IF NOT EXISTSidx_detection_events_camera_occurred
     ON detection_events (camera_id, occurred_at);
 
-CREATE INDEX idx_detection_events_type_occurred
+CREATE INDEX IF NOT EXISTSidx_detection_events_type_occurred
     ON detection_events (event_type, occurred_at);
 
 -- =============================================================================
 -- Table: grid_layouts
 -- =============================================================================
-CREATE TABLE grid_layouts (
+CREATE TABLE IF NOT EXISTSgrid_layouts (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id          VARCHAR(255) NOT NULL,  -- Keycloak user ID
     name             VARCHAR(255) NOT NULL,
@@ -186,6 +189,7 @@ CREATE TABLE grid_layouts (
 COMMENT ON TABLE grid_layouts IS
     'Saved multi-camera grid/layout configurations per user for the live-view UI.';
 
+DROP TRIGGER IF EXISTS trg_grid_layouts_updated_at ON grid_layouts;
 CREATE TRIGGER trg_grid_layouts_updated_at
     BEFORE UPDATE ON grid_layouts
     FOR EACH ROW
@@ -194,7 +198,7 @@ CREATE TRIGGER trg_grid_layouts_updated_at
 -- =============================================================================
 -- Table: retention_policies
 -- =============================================================================
-CREATE TABLE retention_policies (
+CREATE TABLE IF NOT EXISTSretention_policies (
     id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name              VARCHAR(255) NOT NULL,
     camera_id         UUID         REFERENCES cameras (id),  -- NULL = global policy
@@ -210,6 +214,7 @@ CREATE TABLE retention_policies (
 COMMENT ON TABLE retention_policies IS
     'Configurable data-retention rules per camera or globally, controlling automatic cleanup.';
 
+DROP TRIGGER IF EXISTS trg_retention_policies_updated_at ON retention_policies;
 CREATE TRIGGER trg_retention_policies_updated_at
     BEFORE UPDATE ON retention_policies
     FOR EACH ROW
@@ -218,7 +223,7 @@ CREATE TRIGGER trg_retention_policies_updated_at
 -- =============================================================================
 -- Table: audit_logs  (security / audit trail)
 -- =============================================================================
-CREATE TABLE audit_logs (
+CREATE TABLE IF NOT EXISTSaudit_logs (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id       VARCHAR(255),
     user_email    VARCHAR(255),
@@ -234,19 +239,19 @@ CREATE TABLE audit_logs (
 COMMENT ON TABLE audit_logs IS
     'Immutable audit trail capturing every user and system action for security compliance.';
 
-CREATE INDEX idx_audit_logs_user_created
+CREATE INDEX IF NOT EXISTSidx_audit_logs_user_created
     ON audit_logs (user_id, created_at);
 
-CREATE INDEX idx_audit_logs_resource
+CREATE INDEX IF NOT EXISTSidx_audit_logs_resource
     ON audit_logs (resource_type, resource_id);
 
-CREATE INDEX idx_audit_logs_action_created
+CREATE INDEX IF NOT EXISTSidx_audit_logs_action_created
     ON audit_logs (action, created_at);
 
 -- =============================================================================
 -- Table: network_events  (security / network monitoring)
 -- =============================================================================
-CREATE TABLE network_events (
+CREATE TABLE IF NOT EXISTSnetwork_events (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     event_type      VARCHAR(100) NOT NULL
         CHECK (event_type IN (
@@ -272,13 +277,13 @@ CREATE TABLE network_events (
 COMMENT ON TABLE network_events IS
     'Security events detected on the local network such as scans, brute-force attempts, and anomalies.';
 
-CREATE INDEX idx_network_events_type_created
+CREATE INDEX IF NOT EXISTSidx_network_events_type_created
     ON network_events (event_type, created_at);
 
-CREATE INDEX idx_network_events_severity_created
+CREATE INDEX IF NOT EXISTSidx_network_events_severity_created
     ON network_events (severity, created_at);
 
-CREATE INDEX idx_network_events_source_ip_created
+CREATE INDEX IF NOT EXISTSidx_network_events_source_ip_created
     ON network_events (source_ip, created_at);
 
-COMMIT;
+-- end migration 001
