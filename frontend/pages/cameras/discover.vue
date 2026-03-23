@@ -143,15 +143,21 @@
 
 <script setup lang="ts">
 const { success, error: showError } = useToast()
-const subnets = ref('192.168.1.0/24')
+const store = useDiscoveryStore()
 const timeout = ref(30)
-const scanning = ref(false)
 const pinging = ref(false)
-const devices = ref<any[]>([])
-const pingResults = ref<any[]>([])
 const testUrl = ref('')
 const testing = ref(false)
 const testResult = ref<any>(null)
+
+// Use store state (persists across navigation)
+const subnets = computed({
+  get: () => store.subnets || '192.168.1.0/24',
+  set: (v: string) => store.setSubnets(v),
+})
+const scanning = computed(() => store.scanning)
+const devices = computed(() => store.devices)
+const pingResults = computed(() => store.pingResults)
 
 const testRtsp = async () => {
   if (!testUrl.value) return
@@ -169,39 +175,31 @@ const testRtsp = async () => {
 }
 
 onMounted(async () => {
-  try {
-    const detected = await useApi<string[]>('/api/discovery/subnets')
-    if (detected.length > 0) {
-      subnets.value = detected.join(', ')
-    }
-  } catch {}
+  // Auto-detect subnets if not already set
+  if (!store.subnets) {
+    try {
+      const detected = await useApi<string[]>('/api/discovery/subnets')
+      if (detected.length > 0) {
+        store.setSubnets(detected.join(', '))
+      }
+    } catch {}
+  }
 })
 
 const startScan = async () => {
-  scanning.value = true
-  devices.value = []
+  store.setScanning(true)
   try {
-    const subnetList = subnets.value.split(',').map(s => s.trim()).filter(Boolean)
+    const subnetList = subnets.value.split(',').map((s: string) => s.trim()).filter(Boolean)
     const result = await useApi<any[]>('/api/discovery/scan', {
       method: 'POST',
       body: { subnets: subnetList, timeout_secs: timeout.value },
     })
-    // Enrich each device with edit fields
-    devices.value = result.map(d => ({
-      ...d,
-      showEdit: false,
-      editName: d.name || `Camera ${d.ip}`,
-      editBrand: d.brand || '',
-      editUrl: d.rtsp_url || `rtsp://${d.ip}:554/stream1`,
-      editProtocol: d.protocols[0] || 'rtsp',
-      editUsername: '',
-      editPassword: '',
-    }))
+    store.setDevices(result)
     success(`Found ${result.length} devices`)
   } catch (e) {
     showError('Scan failed')
   } finally {
-    scanning.value = false
+    store.setScanning(false)
   }
 }
 
@@ -218,8 +216,7 @@ const quickAdd = async (device: any) => {
       },
     })
     success(`Camera "${device.editName}" added!`)
-    // Remove from discovered list
-    devices.value = devices.value.filter(d => d.ip !== device.ip)
+    store.removeDevice(device.ip)
   } catch (e) {
     showError('Failed to add camera')
   }
@@ -241,7 +238,7 @@ const saveCustom = async (device: any) => {
     })
     success(`Camera "${device.editName}" saved!`)
     device.showEdit = false
-    devices.value = devices.value.filter(d => d.ip !== device.ip)
+    store.removeDevice(device.ip)
   } catch (e) {
     showError('Failed to save camera')
   }
@@ -250,9 +247,10 @@ const saveCustom = async (device: any) => {
 const pingAll = async () => {
   pinging.value = true
   try {
-    pingResults.value = await useApi<any[]>('/api/cameras/ping-all', { method: 'POST' })
-    const online = pingResults.value.filter(r => r.alive).length
-    success(`${online}/${pingResults.value.length} cameras online`)
+    const results = await useApi<any[]>('/api/cameras/ping-all', { method: 'POST' })
+    store.setPingResults(results)
+    const online = results.filter((r: any) => r.alive).length
+    success(`${online}/${results.length} cameras online`)
   } catch (e) {
     showError('Ping failed')
   } finally {
@@ -263,10 +261,10 @@ const pingAll = async () => {
 const pingSingle = async (cameraId: string) => {
   try {
     const result = await useApi<any>(`/api/cameras/${cameraId}/ping`, { method: 'POST' })
-    const idx = pingResults.value.findIndex(r => r.camera_id === cameraId)
-    if (idx >= 0) {
-      pingResults.value[idx] = result
-    }
+    const results = [...store.pingResults]
+    const idx = results.findIndex((r: any) => r.camera_id === cameraId)
+    if (idx >= 0) results[idx] = result
+    store.setPingResults(results)
     if (result.alive) {
       success(`${result.name} is online`)
     } else {
