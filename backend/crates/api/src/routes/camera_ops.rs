@@ -14,6 +14,8 @@ pub fn routes(state: AppState) -> Router {
         .route("/cameras/{id}/start", post(start_camera))
         .route("/cameras/{id}/stop", post(stop_camera))
         .route("/cameras/{id}/snapshot", axum::routing::get(get_snapshot))
+        .route("/cameras/{id}/ping", post(ping_camera))
+        .route("/cameras/ping-all", post(ping_all_cameras))
         .route("/cameras/test-url", post(test_url))
         .with_state(state)
 }
@@ -219,4 +221,106 @@ async fn get_snapshot(
         [(header::CONTENT_TYPE, "application/json")],
         serde_json::to_vec(&response).unwrap_or_default(),
     ).into_response())
+}
+
+/// Ping a camera to check if it's still alive (TCP probe on known ports)
+async fn ping_camera(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> ApiResult<Json<serde_json::Value>> {
+    let camera = state.camera_queries.get_camera(id).await?;
+
+    // Extract host from stream URL
+    let host = extract_host(&camera.stream_url);
+    let port = extract_port(&camera.stream_url).unwrap_or(554);
+
+    let addr = format!("{}:{}", host, port);
+    let alive = match tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        tokio::net::TcpStream::connect(&addr),
+    )
+    .await
+    {
+        Ok(Ok(_)) => true,
+        _ => false,
+    };
+
+    // Update camera status based on ping result
+    let new_status = if alive {
+        open_nvr_domain::entities::CameraStatus::Online
+    } else {
+        open_nvr_domain::entities::CameraStatus::Offline
+    };
+
+    // Update status in DB
+    let _ = sqlx::query("UPDATE cameras SET status = $1, updated_at = now() WHERE id = $2")
+        .bind(new_status.to_string())
+        .bind(id)
+        .execute(&state.db_pool)
+        .await;
+
+    Ok(Json(serde_json::json!({
+        "camera_id": id,
+        "name": camera.name,
+        "alive": alive,
+        "status": new_status.to_string(),
+        "host": host,
+        "port": port,
+    })))
+}
+
+/// Ping all cameras to update their liveness status
+async fn ping_all_cameras(
+    State(state): State<AppState>,
+) -> ApiResult<Json<Vec<serde_json::Value>>> {
+    let cameras = state.camera_queries.list_cameras().await?;
+    let mut results = Vec::new();
+
+    for camera in &cameras {
+        let host = extract_host(&camera.stream_url);
+        let port = extract_port(&camera.stream_url).unwrap_or(554);
+        let addr = format!("{}:{}", host, port);
+
+        let alive = match tokio::time::timeout(
+            std::time::Duration::from_secs(3),
+            tokio::net::TcpStream::connect(&addr),
+        )
+        .await
+        {
+            Ok(Ok(_)) => true,
+            _ => false,
+        };
+
+        let new_status = if alive { "online" } else { "offline" };
+        let _ = sqlx::query("UPDATE cameras SET status = $1, updated_at = now() WHERE id = $2")
+            .bind(new_status)
+            .bind(camera.id)
+            .execute(&state.db_pool)
+            .await;
+
+        results.push(serde_json::json!({
+            "camera_id": camera.id,
+            "name": camera.name,
+            "alive": alive,
+            "status": new_status,
+        }));
+    }
+
+    Ok(Json(results))
+}
+
+fn extract_host(url: &str) -> String {
+    // Parse host from rtsp://user:pass@host:port/path or http://host:port/path
+    let without_scheme = url.split("://").nth(1).unwrap_or(url);
+    let without_auth = without_scheme.split('@').last().unwrap_or(without_scheme);
+    let host_port = without_auth.split('/').next().unwrap_or(without_auth);
+    host_port.split(':').next().unwrap_or(host_port).to_string()
+}
+
+fn extract_port(url: &str) -> Option<u16> {
+    let without_scheme = url.split("://").nth(1)?;
+    let without_auth = without_scheme.split('@').last()?;
+    let host_port = without_auth.split('/').next()?;
+    let port_str = host_port.split(':').nth(1)?;
+    port_str.parse().ok()
 }

@@ -14,6 +14,10 @@
       </div>
       <div class="flex justify-end gap-2 mt-3">
         <NuxtLink :to="`/cameras/${camera.id}`" class="text-xs text-primary-400 hover:underline">Edit</NuxtLink>
+        <button @click="testCamera" class="text-xs text-green-400 hover:underline">Test</button>
+        <button @click="toggleRecording" class="text-xs text-yellow-400 hover:underline">
+          {{ camera.status === 'online' ? 'Stop' : 'Start' }}
+        </button>
         <button @click="$emit('delete', camera.id)" class="text-xs text-red-400 hover:underline">Delete</button>
       </div>
     </div>
@@ -29,4 +33,20 @@ const statusClass = computed(() => ({
   'bg-yellow-500': props.camera.status === 'connecting',
   'bg-orange-500': props.camera.status === 'error',
 }))
+
+const testCamera = async () => {
+  try {
+    const result = await useApi<any>(`/api/cameras/${props.camera.id}/test`, { method: 'POST' })
+    alert(result.status === 'ok' ? 'Connection OK!' : `Error: ${result.error}`)
+  } catch (e) {
+    alert('Test failed')
+  }
+}
+
+const toggleRecording = async () => {
+  const action = props.camera.status === 'online' ? 'stop' : 'start'
+  try {
+    await useApi(`/api/cameras/${props.camera.id}/${action}`, { method: 'POST' })
+  } catch {}
+}
 </script>
