@@ -17,6 +17,7 @@ pub fn routes(state: AppState) -> Router {
         .route("/cameras/{id}/ping", post(ping_camera))
         .route("/cameras/ping-all", post(ping_all_cameras))
         .route("/cameras/test-url", post(test_url))
+        .route("/cameras/status-summary", axum::routing::get(status_summary))
         .with_state(state)
 }
 
@@ -383,6 +384,28 @@ async fn ping_all_cameras(
         }));
     }
 
+    Ok(Json(results))
+}
+
+/// GET /cameras/status-summary — Get status of all cameras
+async fn status_summary(
+    State(state): State<AppState>,
+) -> ApiResult<Json<Vec<serde_json::Value>>> {
+    let cameras = state.camera_queries.list_cameras().await?;
+    let results: Vec<serde_json::Value> = cameras.iter().map(|c| {
+        serde_json::json!({
+            "id": c.id,
+            "name": c.name,
+            "status": c.status.to_string(),
+            "protocol": c.protocol_type.to_string(),
+            "stream_url": c.stream_url,
+            "connection_type": c.connection_type.to_string(),
+            "brand": c.brand,
+            "ptz_capable": c.ptz_capable,
+            "audio_capable": c.audio_capable,
+            "recording_mode": c.recording_mode.to_string(),
+        })
+    }).collect();
     Ok(Json(results))
 }
 

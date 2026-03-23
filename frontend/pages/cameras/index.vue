@@ -31,6 +31,20 @@
       </div>
     </div>
 
+    <!-- Network Warning -->
+    <div v-if="cameras.length > 0 && allOffline" class="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+      <div class="flex items-start gap-2">
+        <span class="text-yellow-500 text-sm mt-0.5">&#9888;</span>
+        <div>
+          <p class="text-xs font-medium text-yellow-700 dark:text-yellow-400">All cameras are offline</p>
+          <p class="text-xs text-yellow-600 dark:text-yellow-500 mt-0.5">
+            Common cause: WiFi AP Isolation prevents the server from reaching cameras.
+            Try connecting the server via ethernet or disabling AP Isolation in your router settings.
+          </p>
+        </div>
+      </div>
+    </div>
+
     <div v-if="loading" class="text-gray-400">Loading cameras...</div>
     <div v-else-if="cameras.length === 0" class="text-gray-400 text-center py-12">
       No cameras configured. Add one or use discovery.
@@ -115,6 +129,7 @@ const quickName = ref('')
 const pinging = ref(false)
 const cameras = computed(() => cameraStore.cameras)
 const loading = computed(() => cameraStore.loading)
+const allOffline = computed(() => cameras.value.length > 0 && cameras.value.every((c: any) => c.status !== 'online'))
 
 const loadCameras = () => cameraStore.fetchAll()
 

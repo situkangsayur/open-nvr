@@ -7,6 +7,23 @@
       <DashboardStatCard title="Offline" :value="stats.offlineCameras" icon="🔴" />
       <DashboardStatCard title="Alerts" :value="stats.unresolvedAlerts" icon="⚠️" />
     </div>
+    <!-- Network Warning -->
+    <div v-if="stats.totalCameras > 0 && stats.onlineCameras === 0" class="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+      <h3 class="text-sm font-semibold text-yellow-700 dark:text-yellow-400 mb-1">All cameras offline</h3>
+      <p class="text-xs text-yellow-600 dark:text-yellow-500">
+        Server cannot reach any cameras. Possible causes:
+      </p>
+      <ul class="text-xs text-yellow-600 dark:text-yellow-500 list-disc list-inside mt-1">
+        <li>WiFi AP Isolation is blocking device-to-device communication</li>
+        <li>Cameras are on a different subnet/VLAN</li>
+        <li>Camera RTSP is not enabled (check V360 Pro / XMEye app settings)</li>
+        <li>Server ethernet cable not connected (recommended for NVR)</li>
+      </ul>
+      <div class="mt-2">
+        <NuxtLink to="/cameras/guide" class="text-xs text-yellow-700 dark:text-yellow-400 underline">View Setup Guide</NuxtLink>
+      </div>
+    </div>
+
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div class="bg-white dark:bg-nvr-card rounded-lg p-4 border border-gray-200 dark:border-nvr-border">
         <h2 class="text-lg font-semibold mb-4">Recent Audit Logs</h2>
