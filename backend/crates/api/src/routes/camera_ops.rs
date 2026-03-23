@@ -229,8 +229,7 @@ async fn get_snapshot(
             "-rtsp_transport", "tcp",
             "-i", &camera.stream_url,
             "-frames:v", "1",
-            "-f", "image2",
-            "-c:v", "mjpeg",
+            "-f", "mjpeg",
             "-q:v", "2",
             "pipe:1",
         ])
