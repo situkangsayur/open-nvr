@@ -20,6 +20,7 @@
         <NuxtLink to="/" :class="linkClass('/')">Dashboard</NuxtLink>
         <NuxtLink to="/cameras" :class="linkClass('/cameras')">Cameras</NuxtLink>
         <NuxtLink to="/cameras/discover" :class="linkClass('/cameras/discover')">Discover / Scanner</NuxtLink>
+        <NuxtLink to="/cameras/guide" :class="linkClass('/cameras/guide')">Setup Guide</NuxtLink>
         <NuxtLink to="/live" :class="linkClass('/live')">Live View</NuxtLink>
         <NuxtLink to="/playback" :class="linkClass('/playback')">Playback</NuxtLink>
         <NuxtLink to="/events" :class="linkClass('/events')">Events</NuxtLink>

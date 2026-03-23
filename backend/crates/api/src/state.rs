@@ -25,6 +25,7 @@ pub struct AppState {
     pub camera_manager: Option<Arc<CameraManager>>,
     pub db_pool: PgPool,
     pub live_tx: broadcast::Sender<LiveFrame>,
+    pub status_tx: broadcast::Sender<String>,
 }
 
 impl AppState {
@@ -95,6 +96,7 @@ impl AppState {
         ));
 
         let (live_tx, _) = broadcast::channel(1024);
+        let (status_tx, _) = broadcast::channel(256);
 
         let camera_manager = Some(Arc::new(CameraManager::new(
             camera_repo2 as Arc<dyn CameraRepository>,
@@ -123,6 +125,7 @@ impl AppState {
             camera_manager,
             db_pool: pool,
             live_tx,
+            status_tx,
         }
     }
 }

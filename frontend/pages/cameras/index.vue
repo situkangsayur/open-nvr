@@ -9,6 +9,9 @@
         <button @click="showAddModal = true" class="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors">
           Add Camera
         </button>
+        <button @click="pingAll" :disabled="pinging" class="bg-gray-100 dark:bg-nvr-darker hover:bg-gray-200 dark:hover:bg-nvr-border text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg border border-gray-200 dark:border-nvr-border transition-colors text-sm">
+          {{ pinging ? 'Checking...' : 'Ping All' }}
+        </button>
       </div>
     </div>
 
@@ -91,10 +94,21 @@ const newCamera = ref({
   connection_type: 'ethernet',
 })
 
+const pinging = ref(false)
 const cameras = computed(() => cameraStore.cameras)
 const loading = computed(() => cameraStore.loading)
 
 const loadCameras = () => cameraStore.fetchAll()
+
+const pingAll = async () => {
+  pinging.value = true
+  try {
+    await useApi('/api/cameras/ping-all', { method: 'POST' })
+    await loadCameras()
+    success('Camera status updated')
+  } catch { }
+  pinging.value = false
+}
 
 const addCamera = async () => {
   try {
@@ -117,5 +131,13 @@ const deleteCamera = async (id: string) => {
   }
 }
 
-onMounted(loadCameras)
+// Auto-refresh every 30 seconds
+let refreshInterval: ReturnType<typeof setInterval>
+onMounted(() => {
+  loadCameras()
+  refreshInterval = setInterval(loadCameras, 30000)
+})
+onUnmounted(() => {
+  if (refreshInterval) clearInterval(refreshInterval)
+})
 </script>

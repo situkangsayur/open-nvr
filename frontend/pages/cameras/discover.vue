@@ -28,6 +28,23 @@
       </div>
     </div>
 
+    <!-- Quick RTSP Test -->
+    <div class="bg-white dark:bg-nvr-card rounded-lg p-6 border border-gray-200 dark:border-nvr-border mb-6">
+      <h2 class="text-lg font-semibold mb-4">Quick RTSP Test</h2>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">Test an RTSP URL to check if a camera is accessible</p>
+      <div class="flex gap-3">
+        <input v-model="testUrl" type="text" placeholder="rtsp://admin:password@192.168.1.9:554/stream1" class="flex-1 bg-gray-50 dark:bg-nvr-darker border border-gray-200 dark:border-nvr-border rounded px-3 py-2 text-gray-900 dark:text-white text-sm" />
+        <button @click="testRtsp" :disabled="testing" class="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm transition-colors">
+          {{ testing ? 'Testing...' : 'Test' }}
+        </button>
+      </div>
+      <div v-if="testResult" class="mt-3 p-3 rounded text-sm" :class="testResult.status === 'ok' ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400' : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'">
+        <strong>{{ testResult.status === 'ok' ? 'Connection OK!' : 'Connection Failed' }}</strong>
+        <span v-if="testResult.error" class="ml-2">{{ testResult.error }}</span>
+        <div v-if="testResult.stream_info" class="mt-1 text-xs">Codec: {{ testResult.stream_info.video_codec }}</div>
+      </div>
+    </div>
+
     <!-- Discovered Devices -->
     <div v-if="devices.length > 0" class="bg-white dark:bg-nvr-card rounded-lg border border-gray-200 dark:border-nvr-border mb-6">
       <div class="p-4 border-b border-gray-200 dark:border-nvr-border">
@@ -132,6 +149,33 @@ const scanning = ref(false)
 const pinging = ref(false)
 const devices = ref<any[]>([])
 const pingResults = ref<any[]>([])
+const testUrl = ref('')
+const testing = ref(false)
+const testResult = ref<any>(null)
+
+const testRtsp = async () => {
+  if (!testUrl.value) return
+  testing.value = true
+  testResult.value = null
+  try {
+    testResult.value = await useApi<any>('/api/cameras/test-url', {
+      method: 'POST',
+      body: { protocol_type: 'rtsp', stream_url: testUrl.value },
+    })
+  } catch (e: any) {
+    testResult.value = { status: 'error', error: e?.data?.error?.message || 'Connection failed' }
+  }
+  testing.value = false
+}
+
+onMounted(async () => {
+  try {
+    const detected = await useApi<string[]>('/api/discovery/subnets')
+    if (detected.length > 0) {
+      subnets.value = detected.join(', ')
+    }
+  } catch {}
+})
 
 const startScan = async () => {
   scanning.value = true

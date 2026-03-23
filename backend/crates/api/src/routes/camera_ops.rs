@@ -161,21 +161,25 @@ async fn stop_camera(
 }
 
 /// Get a snapshot/thumbnail from a camera.
-/// This attempts to grab a single frame from the camera's stream URL.
-/// For MJPEG cameras, it fetches a single JPEG frame.
-/// For RTSP cameras, it returns camera metadata (full snapshot requires ffmpeg).
+/// For MJPEG cameras, it fetches a single JPEG frame via HTTP.
+/// For RTSP and other protocols, it uses ffmpeg to grab a single frame.
 async fn get_snapshot(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
-) -> ApiResult<axum::response::Response> {
+) -> axum::response::Response {
     use axum::http::{header, StatusCode};
     use axum::response::IntoResponse;
 
-    let camera = state.camera_queries.get_camera(id).await?;
+    let camera = match state.camera_queries.get_camera(id).await {
+        Ok(c) => c,
+        Err(e) => {
+            let err: crate::error::ApiError = e.into();
+            return err.into_response();
+        }
+    };
 
-    // For MJPEG cameras, try to fetch a snapshot directly via HTTP
+    // For MJPEG cameras, try to fetch a snapshot directly via HTTP first
     if camera.protocol_type.to_string() == "mjpeg" {
-        // Attempt to fetch a single JPEG frame from the MJPEG stream URL
         let snapshot_url = camera.stream_url.replace("/video", "/snapshot")
             .replace("/mjpeg", "/snapshot");
 
@@ -187,40 +191,91 @@ async fn get_snapshot(
         {
             Ok(resp) if resp.status().is_success() => {
                 if let Ok(bytes) = resp.bytes().await {
-                    return Ok((
+                    return (
                         StatusCode::OK,
                         [
                             (header::CONTENT_TYPE, "image/jpeg"),
                             (header::CACHE_CONTROL, "no-cache"),
                         ],
                         bytes.to_vec(),
-                    ).into_response());
+                    ).into_response();
                 }
             }
             _ => {
-                // Fall through to metadata response
+                // Fall through to ffmpeg capture
             }
         }
     }
 
-    // For RTSP and other protocols, or if MJPEG snapshot failed,
-    // return camera metadata as a JSON response.
-    // Full frame capture from RTSP requires ffmpeg integration.
-    let response = serde_json::json!({
-        "camera_id": id,
-        "name": camera.name,
-        "protocol": camera.protocol_type.to_string(),
-        "status": camera.status.to_string(),
-        "stream_url": camera.stream_url,
-        "snapshot_available": false,
-        "message": "Snapshot capture requires ffmpeg integration for RTSP streams. Use the MJPEG protocol for direct snapshot support.",
-    });
+    // Check if ffmpeg is available
+    if tokio::process::Command::new("ffmpeg")
+        .arg("-version")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .await
+        .is_err()
+    {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            axum::Json(serde_json::json!({"error": "ffmpeg not installed on server"})),
+        ).into_response();
+    }
 
-    Ok((
-        StatusCode::OK,
-        [(header::CONTENT_TYPE, "application/json")],
-        serde_json::to_vec(&response).unwrap_or_default(),
-    ).into_response())
+    // Use ffmpeg to grab a single frame from the camera stream
+    let output = tokio::process::Command::new("ffmpeg")
+        .args([
+            "-rtsp_transport", "tcp",
+            "-i", &camera.stream_url,
+            "-frames:v", "1",
+            "-f", "image2",
+            "-c:v", "mjpeg",
+            "-q:v", "2",
+            "pipe:1",
+        ])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .output()
+        .await;
+
+    match output {
+        Ok(out) if out.status.success() && !out.stdout.is_empty() => {
+            (
+                StatusCode::OK,
+                [
+                    (header::CONTENT_TYPE, "image/jpeg"),
+                    (header::CACHE_CONTROL, "no-cache"),
+                ],
+                out.stdout,
+            ).into_response()
+        }
+        Ok(out) => {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            tracing::error!(
+                camera_id = %id,
+                exit_code = ?out.status.code(),
+                stderr = %stderr,
+                "ffmpeg snapshot failed"
+            );
+            (
+                StatusCode::BAD_GATEWAY,
+                axum::Json(serde_json::json!({
+                    "error": format!("Snapshot failed: ffmpeg exit code {:?}", out.status.code()),
+                    "camera_id": id,
+                })),
+            ).into_response()
+        }
+        Err(e) => {
+            tracing::error!(camera_id = %id, error = %e, "ffmpeg execution error");
+            (
+                StatusCode::BAD_GATEWAY,
+                axum::Json(serde_json::json!({
+                    "error": format!("ffmpeg execution error: {}", e),
+                    "camera_id": id,
+                })),
+            ).into_response()
+        }
+    }
 }
 
 /// Ping a camera to check if it's still alive (TCP probe on known ports)
@@ -258,6 +313,17 @@ async fn ping_camera(
         .bind(id)
         .execute(&state.db_pool)
         .await;
+
+    // Broadcast status change via WebSocket
+    let event = serde_json::json!({
+        "type": "camera_status",
+        "camera_id": id.to_string(),
+        "name": camera.name,
+        "status": new_status.to_string(),
+        "alive": alive,
+        "timestamp": chrono::Utc::now().to_rfc3339(),
+    });
+    let _ = state.status_tx.send(event.to_string());
 
     Ok(Json(serde_json::json!({
         "camera_id": id,
@@ -297,6 +363,17 @@ async fn ping_all_cameras(
             .bind(camera.id)
             .execute(&state.db_pool)
             .await;
+
+        // Broadcast status change via WebSocket
+        let event = serde_json::json!({
+            "type": "camera_status",
+            "camera_id": camera.id.to_string(),
+            "name": camera.name,
+            "status": new_status,
+            "alive": alive,
+            "timestamp": chrono::Utc::now().to_rfc3339(),
+        });
+        let _ = state.status_tx.send(event.to_string());
 
         results.push(serde_json::json!({
             "camera_id": camera.id,
