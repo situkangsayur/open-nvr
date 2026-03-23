@@ -5,7 +5,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;
 use tokio::net::TcpStream;
 use tokio::time::timeout;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 /// Known camera MAC OUI prefixes and their brands
 const CAMERA_OUI: &[(&str, &str)] = &[
@@ -183,6 +183,94 @@ impl NetworkScanner {
     }
 }
 
+/// Send ONVIF WS-Discovery probe via UDP multicast
+async fn onvif_discover() -> Vec<DiscoveredDevice> {
+    use tokio::net::UdpSocket;
+
+    let probe = r#"<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"
+            xmlns:a="http://schemas.xmlsoap.org/ws/2004/08/addressing"
+            xmlns:d="http://schemas.xmlsoap.org/ws/2005/04/discovery"
+            xmlns:dn="http://www.onvif.org/ver10/network/wsdl">
+  <s:Header>
+    <a:Action s:mustUnderstand="1">http://schemas.xmlsoap.org/ws/2005/04/discovery/Probe</a:Action>
+    <a:MessageID>uuid:__MSG_ID__</a:MessageID>
+    <a:ReplyTo><a:Address>http://schemas.xmlsoap.org/ws/2004/08/addressing/role/anonymous</a:Address></a:ReplyTo>
+    <a:To s:mustUnderstand="1">urn:schemas-xmlsoap-org:ws:2005:04:discovery</a:To>
+  </s:Header>
+  <s:Body>
+    <d:Probe>
+      <d:Types>dn:NetworkVideoTransmitter</d:Types>
+    </d:Probe>
+  </s:Body>
+</s:Envelope>"#;
+
+    let msg_id = uuid::Uuid::new_v4().to_string();
+    let probe = probe.replace("__MSG_ID__", &msg_id);
+
+    let mut devices = Vec::new();
+
+    let socket = match UdpSocket::bind("0.0.0.0:0").await {
+        Ok(s) => s,
+        Err(e) => {
+            warn!(error = %e, "Failed to create UDP socket for ONVIF discovery");
+            return devices;
+        }
+    };
+
+    // Send to multicast address
+    if let Err(e) = socket.send_to(probe.as_bytes(), "239.255.255.250:3702").await {
+        warn!(error = %e, "Failed to send ONVIF probe");
+        return devices;
+    }
+
+    // Listen for responses for 5 seconds
+    let mut buf = vec![0u8; 65535];
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+
+    loop {
+        match tokio::time::timeout_at(deadline, socket.recv_from(&mut buf)).await {
+            Ok(Ok((len, addr))) => {
+                let response = String::from_utf8_lossy(&buf[..len]);
+                debug!(from = %addr, "ONVIF discovery response");
+
+                // Parse XAddrs from response to get device service URL
+                if let Some(xaddrs) = extract_xaddrs(&response) {
+                    for xaddr in xaddrs {
+                        let ip = addr.ip();
+                        devices.push(DiscoveredDevice {
+                            ip,
+                            mac: None,
+                            brand: None,
+                            model: None,
+                            name: Some(format!("ONVIF Camera {}", ip)),
+                            protocols: vec!["onvif".to_string(), "rtsp".to_string()],
+                            rtsp_url: None,
+                            onvif_url: Some(xaddr),
+                            http_url: Some(format!("http://{}", ip)),
+                        });
+                    }
+                }
+            }
+            Ok(Err(_)) | Err(_) => break,
+        }
+    }
+
+    info!(count = devices.len(), "ONVIF WS-Discovery found devices");
+    devices
+}
+
+/// Extract XAddrs URLs from WS-Discovery ProbeMatch response
+fn extract_xaddrs(xml: &str) -> Option<Vec<String>> {
+    // Simple regex-free XML extraction
+    let start_tag = "XAddrs>";
+    let start = xml.find(start_tag)? + start_tag.len();
+    let end = xml[start..].find('<')? + start;
+    let addrs = &xml[start..end];
+
+    Some(addrs.split_whitespace().map(String::from).collect())
+}
+
 /// Try to identify camera brand by making HTTP request
 async fn identify_brand_by_http(ip: Ipv4Addr) -> Option<String> {
     let client = reqwest::Client::builder()
@@ -290,6 +378,17 @@ impl DeviceDiscovery for NetworkScanner {
                         );
                         all_devices.push(device);
                     }
+                }
+            }
+        }
+
+        // Run ONVIF WS-Discovery in parallel with port scanning
+        if request.include_onvif {
+            let onvif_devices = onvif_discover().await;
+            for device in onvif_devices {
+                // Only add if not already found by port scanning
+                if !all_devices.iter().any(|d| d.ip == device.ip) {
+                    all_devices.push(device);
                 }
             }
         }

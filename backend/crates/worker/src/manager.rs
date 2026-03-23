@@ -1,5 +1,6 @@
 use open_nvr_domain::entities::*;
 use open_nvr_domain::ports::*;
+use open_nvr_infrastructure::crypto::credentials::CredentialEncryptor as InfraEncryptor;
 use open_nvr_infrastructure::protocols::create_stream_ingester;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -19,6 +20,7 @@ pub struct CameraManager {
     _event_repo: Arc<dyn DetectionEventRepository>,
     _zone_repo: Arc<dyn DetectionZoneRepository>,
     storage: Option<Arc<dyn ObjectStorage>>,
+    encryptor: Option<InfraEncryptor>,
     live_tx: broadcast::Sender<LiveFrame>,
     tasks: Arc<RwLock<HashMap<Uuid, CameraTask>>>,
 }
@@ -36,6 +38,7 @@ impl CameraManager {
         event_repo: Arc<dyn DetectionEventRepository>,
         zone_repo: Arc<dyn DetectionZoneRepository>,
         storage: Option<Arc<dyn ObjectStorage>>,
+        encryptor: Option<InfraEncryptor>,
         live_tx: broadcast::Sender<LiveFrame>,
     ) -> Self {
         Self {
@@ -45,6 +48,7 @@ impl CameraManager {
             _event_repo: event_repo,
             _zone_repo: zone_repo,
             storage,
+            encryptor,
             live_tx,
             tasks: Arc::new(RwLock::new(HashMap::new())),
         }
@@ -82,12 +86,36 @@ impl CameraManager {
 
         info!(camera_id = %camera_id, name = %camera.name, protocol = %camera.protocol_type, "Starting camera tasks");
 
+        // Decrypt credentials if available
+        let (username, password) = if let Some(ref encrypted) = camera.credentials_encrypted {
+            if let Some(ref enc) = self.encryptor {
+                match enc.decrypt(encrypted) {
+                    Ok(creds) => {
+                        let parts: Vec<&str> = creds.splitn(2, ':').collect();
+                        if parts.len() == 2 {
+                            (Some(parts[0].to_string()), Some(parts[1].to_string()))
+                        } else {
+                            (None, None)
+                        }
+                    }
+                    Err(e) => {
+                        warn!(camera_id = %camera_id, error = %e, "Failed to decrypt credentials");
+                        (None, None)
+                    }
+                }
+            } else {
+                (None, None)
+            }
+        } else {
+            (None, None)
+        };
+
         // Create protocol adapter
         let ingester = match create_stream_ingester(
             &camera.protocol_type.to_string(),
             &camera.stream_url,
-            None, // TODO: decrypt credentials
-            None,
+            username.as_deref(),
+            password.as_deref(),
         ) {
             Ok(ing) => ing,
             Err(e) => {

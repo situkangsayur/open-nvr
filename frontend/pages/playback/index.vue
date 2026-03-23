@@ -1,6 +1,11 @@
 <template>
   <div>
-    <h1 class="text-2xl font-bold mb-6">Playback</h1>
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-bold">Playback</h1>
+      <button @click="showExport = true" class="bg-nvr-card dark:bg-nvr-darker hover:bg-gray-200 dark:hover:bg-nvr-border text-gray-700 dark:text-white px-4 py-2 rounded-lg border border-gray-200 dark:border-nvr-border transition-colors text-sm">
+        Export MP4
+      </button>
+    </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
       <!-- Controls -->
@@ -91,10 +96,13 @@
         </div>
       </div>
     </div>
+
+    <PlaybackExportDialog :show="showExport" :cameras="cameras" @close="showExport = false" />
   </div>
 </template>
 
 <script setup lang="ts">
+const showExport = ref(false)
 const cameras = ref<any[]>([])
 const selectedCamera = ref('')
 const startDate = ref('')

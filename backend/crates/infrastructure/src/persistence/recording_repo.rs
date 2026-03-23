@@ -98,6 +98,18 @@ impl RecordingRepository for PgRecordingRepository {
 
         Ok(row.map(|r| recording_from_row(&r)))
     }
+
+    async fn find_before_date(&self, before: DateTime<Utc>) -> Result<Vec<Recording>, DomainError> {
+        let rows = sqlx::query(
+            "SELECT id, camera_id, start_time, end_time, recording_type, has_audio, total_size, status, created_at FROM recordings WHERE start_time < $1 AND status = 'completed' ORDER BY start_time LIMIT 1000"
+        )
+        .bind(before)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(rows.iter().map(recording_from_row).collect())
+    }
 }
 
 fn recording_from_row(row: &sqlx::postgres::PgRow) -> Recording {
@@ -180,6 +192,18 @@ impl RecordingSegmentRepository for PgRecordingSegmentRepository {
         .map_err(|e| DomainError::Internal(e.to_string()))?;
 
         Ok(())
+    }
+
+    async fn delete_by_recording(&self, recording_id: Uuid) -> Result<Vec<String>, DomainError> {
+        let rows = sqlx::query(
+            "DELETE FROM recording_segments WHERE recording_id = $1 RETURNING storage_key"
+        )
+        .bind(recording_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(rows.iter().map(|r| r.get::<String, _>("storage_key")).collect())
     }
 }
 

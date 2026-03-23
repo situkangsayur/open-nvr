@@ -2,6 +2,7 @@ mod camera;
 mod camera_ops;
 mod discovery;
 mod events;
+mod export;
 mod group;
 mod health;
 mod audit;
@@ -44,4 +45,5 @@ fn api_routes(state: AppState) -> Router {
         .merge(ptz::routes(state.clone()))
         .merge(layout::routes(state.clone()))
         .merge(retention::routes(state.clone()))
+        .merge(export::routes(state.clone()))
 }

@@ -60,6 +60,9 @@ impl AppState {
             }
         };
 
+        // Create a separate encryptor instance for CameraManager (needs the concrete type)
+        let manager_encryptor = open_nvr_infrastructure::crypto::credentials::CredentialEncryptor::from_env().ok();
+
         let mut camera_cmd_service = CameraCommandService::new(
             camera_repo.clone() as Arc<dyn CameraRepository>,
             audit_repo.clone() as Arc<dyn AuditRepository>,
@@ -98,6 +101,7 @@ impl AppState {
             event_repo2 as Arc<dyn DetectionEventRepository>,
             zone_repo2 as Arc<dyn DetectionZoneRepository>,
             None, // ObjectStorage - will be connected when MinIO env is set
+            manager_encryptor,
             live_tx.clone(),
         )));
 

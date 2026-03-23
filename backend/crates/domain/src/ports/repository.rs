@@ -32,6 +32,7 @@ pub trait RecordingRepository: Send + Sync {
     async fn create(&self, recording: &Recording) -> Result<(), DomainError>;
     async fn update(&self, recording: &Recording) -> Result<(), DomainError>;
     async fn find_active_by_camera(&self, camera_id: Uuid) -> Result<Option<Recording>, DomainError>;
+    async fn find_before_date(&self, before: DateTime<Utc>) -> Result<Vec<Recording>, DomainError>;
 }
 
 #[async_trait]
@@ -39,6 +40,7 @@ pub trait RecordingSegmentRepository: Send + Sync {
     async fn find_by_recording(&self, recording_id: Uuid) -> Result<Vec<RecordingSegment>, DomainError>;
     async fn create(&self, segment: &RecordingSegment) -> Result<(), DomainError>;
     async fn update(&self, segment: &RecordingSegment) -> Result<(), DomainError>;
+    async fn delete_by_recording(&self, recording_id: Uuid) -> Result<Vec<String>, DomainError>;
 }
 
 #[async_trait]
