@@ -1,6 +1,6 @@
 <template>
-  <div class="text-center">
-    <div class="bg-white dark:bg-nvr-card rounded-xl p-8 border border-gray-200 dark:border-nvr-border max-w-md mx-auto shadow-xl">
+  <div class="w-full max-w-md mx-auto text-center">
+    <div class="bg-white dark:bg-nvr-card rounded-xl p-8 border border-gray-200 dark:border-nvr-border shadow-xl">
       <div class="mb-6">
         <div class="w-16 h-16 bg-primary-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
           <span class="text-2xl font-bold text-white">NVR</span>
