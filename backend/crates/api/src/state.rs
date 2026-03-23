@@ -21,6 +21,7 @@ pub struct AppState {
     pub event_repo: Arc<dyn DetectionEventRepository>,
     pub layout_repo: Arc<dyn GridLayoutRepository>,
     pub retention_repo: Arc<dyn RetentionPolicyRepository>,
+    pub permission_repo: Arc<dyn UserPermissionRepository>,
     pub camera_manager: Option<Arc<CameraManager>>,
     pub db_pool: PgPool,
     pub live_tx: broadcast::Sender<LiveFrame>,
@@ -38,6 +39,7 @@ impl AppState {
         let zone_repo = Arc::new(PgDetectionZoneRepository::new(pool.clone()));
         let layout_repo = Arc::new(PgGridLayoutRepository::new(pool.clone()));
         let retention_repo = Arc::new(PgRetentionPolicyRepository::new(pool.clone()));
+        let permission_repo = Arc::new(PgUserPermissionRepository::new(pool.clone()));
 
         // Extra clones for CameraManager (needs its own repo handles)
         let camera_repo2 = Arc::new(PgCameraRepository::new(pool.clone()));
@@ -117,6 +119,7 @@ impl AppState {
             event_repo: event_repo as Arc<dyn DetectionEventRepository>,
             layout_repo: layout_repo as Arc<dyn GridLayoutRepository>,
             retention_repo: retention_repo as Arc<dyn RetentionPolicyRepository>,
+            permission_repo: permission_repo as Arc<dyn UserPermissionRepository>,
             camera_manager,
             db_pool: pool,
             live_tx,

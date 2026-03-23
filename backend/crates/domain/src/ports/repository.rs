@@ -76,3 +76,12 @@ pub trait RetentionPolicyRepository: Send + Sync {
     async fn update(&self, policy: &RetentionPolicy) -> Result<(), DomainError>;
     async fn delete(&self, id: Uuid) -> Result<(), DomainError>;
 }
+
+#[async_trait]
+pub trait UserPermissionRepository: Send + Sync {
+    async fn find_by_user(&self, user_id: &str) -> Result<Vec<crate::entities::UserCameraAccess>, DomainError>;
+    async fn find_by_camera(&self, camera_id: Uuid) -> Result<Vec<crate::entities::UserCameraAccess>, DomainError>;
+    async fn grant(&self, access: &crate::entities::UserCameraAccess) -> Result<(), DomainError>;
+    async fn revoke(&self, user_id: &str, camera_id: Uuid) -> Result<(), DomainError>;
+    async fn revoke_all_for_user(&self, user_id: &str) -> Result<(), DomainError>;
+}

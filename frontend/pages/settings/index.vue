@@ -18,6 +18,10 @@
         <h2 class="text-lg font-semibold mb-2">Profile & Password</h2>
         <p class="text-sm text-gray-500 dark:text-gray-400">View your profile and change your password</p>
       </NuxtLink>
+      <NuxtLink to="/settings/access" class="bg-white dark:bg-nvr-card rounded-lg p-6 border border-gray-200 dark:border-nvr-border hover:border-primary-500 transition-colors">
+        <h2 class="text-lg font-semibold mb-2">Access Control</h2>
+        <p class="text-sm text-gray-500 dark:text-gray-400">Manage per-user camera permissions and role-based access</p>
+      </NuxtLink>
     </div>
   </div>
 </template>
