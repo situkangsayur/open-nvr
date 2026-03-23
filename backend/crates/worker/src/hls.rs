@@ -48,31 +48,25 @@ impl HlsStreamManager {
 
         let playlist_path = cam_dir.join("stream.m3u8");
 
-        // Start ffmpeg: RTSP -> HLS with audio
+        // Start ffmpeg: RTSP -> HLS
+        // -nostdin prevents ffmpeg from reading stdin (critical in background)
+        // -an skips audio if not available (prevents crash)
+        // Copy video = no transcode = fast + low CPU
+        let seg_pattern = cam_dir.join("seg_%03d.ts");
         let child = Command::new("ffmpeg")
             .args([
-                "-rtsp_transport",
-                "tcp",
-                "-i",
-                &camera.stream_url,
-                "-c:v",
-                "copy", // Copy video (no transcode = fast)
-                "-c:a",
-                "aac", // Transcode audio to AAC for browser compatibility
-                "-ac",
-                "1", // Mono audio
-                "-ar",
-                "44100", // 44.1kHz
-                "-f",
-                "hls",
-                "-hls_time",
-                "2", // 2-second segments
-                "-hls_list_size",
-                "5", // Keep 5 segments (10 seconds buffer)
-                "-hls_flags",
-                "delete_segments+append_list",
-                "-hls_segment_filename",
-                cam_dir.join("seg_%03d.ts").to_str().unwrap(),
+                "-nostdin",
+                "-rtsp_transport", "tcp",
+                "-i", &camera.stream_url,
+                "-c:v", "copy",
+                "-c:a", "aac",
+                "-ac", "1",
+                "-ar", "44100",
+                "-f", "hls",
+                "-hls_time", "2",
+                "-hls_list_size", "5",
+                "-hls_flags", "delete_segments+append_list",
+                "-hls_segment_filename", seg_pattern.to_str().unwrap(),
                 playlist_path.to_str().unwrap(),
             ])
             .stdout(std::process::Stdio::null())
