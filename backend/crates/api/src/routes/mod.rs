@@ -14,6 +14,7 @@ mod ptz;
 mod layout;
 mod retention;
 mod permissions;
+mod system;
 
 use axum::routing::get;
 use axum::Router;
@@ -48,4 +49,5 @@ fn api_routes(state: AppState) -> Router {
         .merge(retention::routes(state.clone()))
         .merge(export::routes(state.clone()))
         .merge(permissions::routes(state.clone()))
+        .merge(system::routes(state.clone()))
 }
