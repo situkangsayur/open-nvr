@@ -17,16 +17,19 @@
         <p class="text-xs text-gray-400 dark:text-gray-500">Network Video Recorder</p>
       </div>
       <nav class="flex-1 p-4 space-y-1">
-        <SidebarLink to="/" label="Dashboard" />
-        <SidebarLink to="/cameras" label="Cameras" />
-        <SidebarLink to="/live" label="Live View" />
-        <SidebarLink to="/playback" label="Playback" />
-        <SidebarLink to="/events" label="Events" />
-        <SidebarLink to="/settings" label="Settings" />
+        <NuxtLink to="/" :class="linkClass('/')">Dashboard</NuxtLink>
+        <NuxtLink to="/cameras" :class="linkClass('/cameras')">Cameras</NuxtLink>
+        <NuxtLink to="/cameras/discover" :class="linkClass('/cameras/discover')">Discover / Scanner</NuxtLink>
+        <NuxtLink to="/live" :class="linkClass('/live')">Live View</NuxtLink>
+        <NuxtLink to="/playback" :class="linkClass('/playback')">Playback</NuxtLink>
+        <NuxtLink to="/events" :class="linkClass('/events')">Events</NuxtLink>
+        <NuxtLink to="/settings" :class="linkClass('/settings')">Settings</NuxtLink>
       </nav>
       <div class="p-4 border-t border-gray-200 dark:border-nvr-border">
         <div class="flex items-center justify-between">
-          <LayoutThemeToggle />
+          <button @click="toggleTheme" class="p-2 rounded-lg transition-colors hover:bg-gray-200 dark:hover:bg-nvr-card text-sm">
+            {{ isDark ? '☀️ Light' : '🌙 Dark' }}
+          </button>
           <button @click="doLogout" class="text-sm text-gray-500 dark:text-gray-400 hover:text-red-500 transition-colors">Sign out</button>
         </div>
       </div>
@@ -36,9 +39,39 @@
 
 <script setup lang="ts">
 const { logout } = useAuth()
+const route = useRoute()
 const mobileOpen = ref(false)
+const isDark = ref(true)
 
-const doLogout = () => {
-  logout()
+onMounted(() => {
+  isDark.value = document.documentElement.classList.contains('dark')
+  // Default to dark if no preference
+  if (!localStorage.getItem('opennvr-theme')) {
+    document.documentElement.classList.add('dark')
+    isDark.value = true
+  }
+})
+
+const toggleTheme = () => {
+  isDark.value = !isDark.value
+  if (isDark.value) {
+    document.documentElement.classList.add('dark')
+    localStorage.setItem('opennvr-theme', 'dark')
+  } else {
+    document.documentElement.classList.remove('dark')
+    localStorage.setItem('opennvr-theme', 'light')
+  }
 }
+
+const linkClass = (path: string) => {
+  const active = path === '/' ? route.path === '/' : route.path.startsWith(path)
+  return [
+    'block px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+    active
+      ? 'bg-primary-100 dark:bg-primary-600/20 text-primary-700 dark:text-primary-400'
+      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-nvr-card',
+  ]
+}
+
+const doLogout = () => logout()
 </script>
