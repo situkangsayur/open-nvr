@@ -4,6 +4,7 @@ mod discovery;
 mod events;
 mod export;
 mod group;
+mod hls;
 mod health;
 mod audit;
 mod storage;
@@ -49,6 +50,7 @@ fn api_routes(state: AppState) -> Router {
         .merge(layout::routes(state.clone()))
         .merge(retention::routes(state.clone()))
         .merge(export::routes(state.clone()))
+        .merge(hls::routes(state.clone()))
         .merge(permissions::routes(state.clone()))
         .merge(system::routes(state.clone()))
         .merge(user::routes(state.clone()))

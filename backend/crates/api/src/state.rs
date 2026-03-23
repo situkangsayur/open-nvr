@@ -2,6 +2,7 @@ use open_nvr_application::commands::*;
 use open_nvr_application::queries::*;
 use open_nvr_domain::ports::*;
 use open_nvr_infrastructure::persistence::*;
+use open_nvr_worker::hls::HlsStreamManager;
 use open_nvr_worker::manager::CameraManager;
 use open_nvr_worker::recording::LiveFrame;
 use sqlx::PgPool;
@@ -23,6 +24,7 @@ pub struct AppState {
     pub retention_repo: Arc<dyn RetentionPolicyRepository>,
     pub permission_repo: Arc<dyn UserPermissionRepository>,
     pub camera_manager: Option<Arc<CameraManager>>,
+    pub hls_manager: Option<Arc<HlsStreamManager>>,
     pub db_pool: PgPool,
     pub live_tx: broadcast::Sender<LiveFrame>,
     pub status_tx: broadcast::Sender<String>,
@@ -95,6 +97,8 @@ impl AppState {
             event_repo.clone() as Arc<dyn DetectionEventRepository>,
         ));
 
+        let hls_manager = Some(Arc::new(HlsStreamManager::new("/tmp/opennvr-hls")));
+
         let (live_tx, _) = broadcast::channel(1024);
         let (status_tx, _) = broadcast::channel(256);
 
@@ -123,6 +127,7 @@ impl AppState {
             retention_repo: retention_repo as Arc<dyn RetentionPolicyRepository>,
             permission_repo: permission_repo as Arc<dyn UserPermissionRepository>,
             camera_manager,
+            hls_manager,
             db_pool: pool,
             live_tx,
             status_tx,

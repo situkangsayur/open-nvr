@@ -56,6 +56,26 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
+    // Start HLS streams for online cameras
+    if let Some(ref hls_mgr) = state.hls_manager {
+        let cameras = state.camera_queries.list_cameras().await.unwrap_or_default();
+        let online: Vec<_> = cameras
+            .iter()
+            .filter(|c| c.status == open_nvr_domain::entities::CameraStatus::Online)
+            .cloned()
+            .collect();
+        if !online.is_empty() {
+            let mgr = hls_mgr.clone();
+            tokio::spawn(async move {
+                // Wait for cameras to be fully online
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                mgr.start_all(&online).await;
+                let count = mgr.active_count().await;
+                info!(count = count, "HLS streams started");
+            });
+        }
+    }
+
     // Health monitor
     let health_camera_repo = Arc::new(
         open_nvr_infrastructure::persistence::PgCameraRepository::new(pool),
