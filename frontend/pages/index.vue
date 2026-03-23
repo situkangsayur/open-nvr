@@ -8,10 +8,10 @@
       <DashboardStatCard title="Alerts" :value="stats.unresolvedAlerts" icon="⚠️" />
     </div>
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div class="bg-nvr-card rounded-lg p-4 border border-nvr-border">
+      <div class="bg-white dark:bg-nvr-card rounded-lg p-4 border border-gray-200 dark:border-nvr-border">
         <h2 class="text-lg font-semibold mb-4">Recent Audit Logs</h2>
         <div v-if="auditLogs.length === 0" class="text-gray-400 text-sm">No recent activity</div>
-        <div v-for="log in auditLogs" :key="log.id" class="flex justify-between items-center py-2 border-b border-nvr-border last:border-0">
+        <div v-for="log in auditLogs" :key="log.id" class="flex justify-between items-center py-2 border-b border-gray-100 dark:border-nvr-border last:border-0">
           <div>
             <span class="text-sm font-medium">{{ log.action }}</span>
             <span class="text-xs text-gray-400 ml-2">{{ log.resource_type }}</span>
@@ -19,10 +19,10 @@
           <span class="text-xs text-gray-500">{{ formatDate(log.created_at) }}</span>
         </div>
       </div>
-      <div class="bg-nvr-card rounded-lg p-4 border border-nvr-border">
+      <div class="bg-white dark:bg-nvr-card rounded-lg p-4 border border-gray-200 dark:border-nvr-border">
         <h2 class="text-lg font-semibold mb-4">Network Security Events</h2>
         <div v-if="networkEvents.length === 0" class="text-gray-400 text-sm">No unresolved events</div>
-        <div v-for="event in networkEvents" :key="event.id" class="flex justify-between items-center py-2 border-b border-nvr-border last:border-0">
+        <div v-for="event in networkEvents" :key="event.id" class="flex justify-between items-center py-2 border-b border-gray-100 dark:border-nvr-border last:border-0">
           <div>
             <span :class="severityClass(event.severity)" class="text-xs font-medium px-2 py-0.5 rounded">{{ event.severity }}</span>
             <span class="text-sm ml-2">{{ event.event_type }}</span>
@@ -32,25 +32,24 @@
       </div>
     </div>
 
-    <!-- System Info -->
-    <div class="bg-nvr-card rounded-lg p-4 border border-nvr-border mt-6">
+    <div class="bg-white dark:bg-nvr-card rounded-lg p-4 border border-gray-200 dark:border-nvr-border mt-6">
       <h2 class="text-lg font-semibold mb-4">System Information</h2>
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
         <div>
-          <span class="text-gray-400">Keycloak</span>
-          <p class="text-primary-400">{{ config.public.keycloakUrl }}</p>
+          <span class="text-gray-500 dark:text-gray-400">Keycloak</span>
+          <p class="text-primary-600 dark:text-primary-400 text-xs break-all">{{ config.public.keycloakUrl }}</p>
         </div>
         <div>
-          <span class="text-gray-400">API</span>
-          <p class="text-primary-400">{{ config.public.apiUrl }}</p>
+          <span class="text-gray-500 dark:text-gray-400">API</span>
+          <p class="text-primary-600 dark:text-primary-400 text-xs break-all">{{ config.public.apiUrl }}</p>
         </div>
         <div>
-          <span class="text-gray-400">Cameras</span>
+          <span class="text-gray-500 dark:text-gray-400">Cameras</span>
           <p>{{ stats.totalCameras }} configured</p>
         </div>
         <div>
-          <span class="text-gray-400">Alerts</span>
-          <p :class="stats.unresolvedAlerts > 0 ? 'text-red-400' : 'text-green-400'">
+          <span class="text-gray-500 dark:text-gray-400">Alerts</span>
+          <p :class="stats.unresolvedAlerts > 0 ? 'text-red-500' : 'text-green-500'">
             {{ stats.unresolvedAlerts }} unresolved
           </p>
         </div>
@@ -60,7 +59,6 @@
 </template>
 
 <script setup lang="ts">
-const { $api } = useNuxtApp()
 const config = useRuntimeConfig()
 const stats = ref({ totalCameras: 0, onlineCameras: 0, offlineCameras: 0, unresolvedAlerts: 0 })
 const auditLogs = ref<any[]>([])
@@ -69,9 +67,9 @@ const networkEvents = ref<any[]>([])
 const formatDate = (date: string) => new Date(date).toLocaleString()
 
 const severityClass = (severity: string) => ({
-  'bg-blue-500/20 text-blue-400': severity === 'info',
-  'bg-yellow-500/20 text-yellow-400': severity === 'warning',
-  'bg-red-500/20 text-red-400': severity === 'critical',
+  'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400': severity === 'info',
+  'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-600 dark:text-yellow-400': severity === 'warning',
+  'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400': severity === 'critical',
 })
 
 onMounted(async () => {
@@ -85,10 +83,10 @@ onMounted(async () => {
   }
   try {
     auditLogs.value = await useApi<any[]>('/api/audit/logs?limit=10')
-  } catch (e) { /* ignore */ }
+  } catch {}
   try {
     networkEvents.value = await useApi<any[]>('/api/audit/network-events')
     stats.value.unresolvedAlerts = networkEvents.value.length
-  } catch (e) { /* ignore */ }
+  } catch {}
 })
 </script>
