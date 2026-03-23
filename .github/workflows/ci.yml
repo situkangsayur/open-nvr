@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-check:
+    name: Backend Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+      - name: Check
+        run: cd backend && SQLX_OFFLINE=true cargo check --workspace
+      - name: Clippy
+        run: cd backend && SQLX_OFFLINE=true cargo clippy --workspace -- -D warnings
+      - name: Test
+        run: cd backend && cargo test --workspace
+      - name: Format
+        run: cd backend && cargo fmt --all -- --check
+
+  frontend-check:
+    name: Frontend Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install
+        run: cd frontend && npm install --legacy-peer-deps
+      - name: Build
+        run: cd frontend && npx nuxt build

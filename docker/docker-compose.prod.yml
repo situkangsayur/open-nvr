@@ -1,0 +1,132 @@
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: opennvr-backend
+    env_file: ../.env
+    ports:
+      - "8888:8888"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - opennvr-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    container_name: opennvr-frontend
+    environment:
+      - NUXT_PUBLIC_API_URL=http://backend:8888
+      - NUXT_PUBLIC_KEYCLOAK_URL=${KEYCLOAK_URL:-http://keycloak:8080}
+      - NUXT_PUBLIC_KEYCLOAK_REALM=${KEYCLOAK_REALM:-opennvr}
+      - NUXT_PUBLIC_KEYCLOAK_CLIENT_ID=${NUXT_PUBLIC_KEYCLOAK_CLIENT_ID:-opennvr-frontend}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - opennvr-network
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: opennvr-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - opennvr-network
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16
+    container_name: opennvr-postgres
+    env_file: ../.env
+    environment:
+      POSTGRES_USER: opennvr
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-opennvr_secret}
+      POSTGRES_DB: opennvr
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U opennvr -d opennvr"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - opennvr-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    container_name: opennvr-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - opennvr-network
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    container_name: opennvr-minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-opennvr}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-opennvr_secret}
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - opennvr-network
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: opennvr-keycloak
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: opennvr
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-opennvr_secret}
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_HOSTNAME: ${KEYCLOAK_HOSTNAME:-localhost}
+      KC_HEALTH_ENABLED: "true"
+      KC_PROXY_HEADERS: "xforwarded"
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    command: start --import-realm --optimized
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - opennvr-network
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  minio-data:
+
+networks:
+  opennvr-network:
+    driver: bridge

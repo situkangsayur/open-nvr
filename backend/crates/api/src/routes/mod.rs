@@ -7,6 +7,9 @@ mod storage;
 mod recording;
 mod timeline;
 mod zones;
+mod ptz;
+mod layout;
+mod retention;
 
 use axum::routing::get;
 use axum::Router;
@@ -33,4 +36,7 @@ fn api_routes(state: AppState) -> Router {
         .merge(timeline::routes(state.clone()))
         .merge(zones::routes(state.clone()))
         .merge(events::routes(state.clone()))
+        .merge(ptz::routes(state.clone()))
+        .merge(layout::routes(state.clone()))
+        .merge(retention::routes(state.clone()))
 }

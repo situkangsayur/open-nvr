@@ -6,7 +6,7 @@
       <span :class="statusClass" class="w-3 h-3 rounded-full"></span>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div :class="camera.ptz_capable ? 'grid grid-cols-1 lg:grid-cols-3 gap-6' : 'grid grid-cols-1 lg:grid-cols-2 gap-6'">
       <!-- Camera Info -->
       <div class="bg-nvr-card rounded-lg p-4 border border-nvr-border">
         <h2 class="text-lg font-semibold mb-4">Camera Details</h2>
@@ -36,6 +36,11 @@
             <button @click="deleteZone(zone.id)" class="text-red-400 hover:underline text-xs">Delete</button>
           </div>
         </div>
+      </div>
+
+      <!-- PTZ Controls (if capable) -->
+      <div v-if="camera.ptz_capable">
+        <CameraPTZControls :camera-id="camera.id" />
       </div>
     </div>
   </div>

@@ -3,7 +3,6 @@ use axum::routing::get;
 use axum::{Json, Router};
 use chrono::{DateTime, Utc};
 use open_nvr_application::dto::*;
-use open_nvr_domain::ports::{AuditRepository, NetworkEventRepository};
 use serde::Deserialize;
 
 use crate::error::ApiResult;

@@ -1,0 +1,23 @@
+# Build stage
+FROM rust:1.83-bookworm AS builder
+
+WORKDIR /app
+COPY backend/ ./
+RUN cargo build --release
+
+# Runtime stage
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libssl3 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /app/target/release/open-nvr /usr/local/bin/open-nvr
+COPY migrations/ /app/migrations/
+
+WORKDIR /app
+ENV RUST_LOG=info,open_nvr=debug
+
+EXPOSE 8888
+CMD ["open-nvr"]

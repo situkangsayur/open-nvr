@@ -14,10 +14,12 @@ pub struct AppState {
     pub group_commands: Arc<GroupCommandService>,
     pub recording_queries: Arc<RecordingQueryService>,
     pub timeline_queries: Arc<TimelineQueryService>,
-    pub audit_repo: Arc<PgAuditRepository>,
-    pub network_event_repo: Arc<PgNetworkEventRepository>,
+    pub audit_repo: Arc<dyn AuditRepository>,
+    pub network_event_repo: Arc<dyn NetworkEventRepository>,
     pub zone_repo: Arc<dyn DetectionZoneRepository>,
     pub event_repo: Arc<dyn DetectionEventRepository>,
+    pub layout_repo: Arc<dyn GridLayoutRepository>,
+    pub retention_repo: Arc<dyn RetentionPolicyRepository>,
     pub db_pool: PgPool,
     pub live_tx: broadcast::Sender<LiveFrame>,
 }
@@ -32,6 +34,8 @@ impl AppState {
         let segment_repo = Arc::new(PgRecordingSegmentRepository::new(pool.clone()));
         let event_repo = Arc::new(PgDetectionEventRepository::new(pool.clone()));
         let zone_repo = Arc::new(PgDetectionZoneRepository::new(pool.clone()));
+        let layout_repo = Arc::new(PgGridLayoutRepository::new(pool.clone()));
+        let retention_repo = Arc::new(PgRetentionPolicyRepository::new(pool.clone()));
 
         let camera_commands = Arc::new(CameraCommandService::new(
             camera_repo.clone() as Arc<dyn CameraRepository>,
@@ -66,10 +70,12 @@ impl AppState {
             group_commands,
             recording_queries,
             timeline_queries,
-            audit_repo,
-            network_event_repo,
+            audit_repo: audit_repo.clone() as Arc<dyn AuditRepository>,
+            network_event_repo: network_event_repo as Arc<dyn NetworkEventRepository>,
             zone_repo: zone_repo as Arc<dyn DetectionZoneRepository>,
             event_repo: event_repo as Arc<dyn DetectionEventRepository>,
+            layout_repo: layout_repo as Arc<dyn GridLayoutRepository>,
+            retention_repo: retention_repo as Arc<dyn RetentionPolicyRepository>,
             db_pool: pool,
             live_tx,
         }

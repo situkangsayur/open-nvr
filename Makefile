@@ -1,4 +1,4 @@
-.PHONY: dev build test docker-up docker-down migrate fmt clippy frontend-dev frontend-build
+.PHONY: dev build test docker-up docker-down migrate fmt clippy frontend-dev frontend-build prod-up prod-down prod-logs
 
 # Start backend in development mode with hot-reload
 dev:
@@ -39,3 +39,15 @@ frontend-dev:
 # Build Nuxt frontend for production
 frontend-build:
 	cd frontend && npm run build
+
+# Start all production services
+prod-up:
+	docker compose -f docker/docker-compose.prod.yml up -d --build
+
+# Stop all production services
+prod-down:
+	docker compose -f docker/docker-compose.prod.yml down
+
+# Follow production service logs
+prod-logs:
+	docker compose -f docker/docker-compose.prod.yml logs -f
