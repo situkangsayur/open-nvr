@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-nvr-darker">
+  <div class="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-nvr-darker">
     <p class="text-gray-400">Authenticating...</p>
   </div>
 </template>

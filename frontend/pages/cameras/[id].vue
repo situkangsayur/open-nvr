@@ -8,7 +8,7 @@
 
     <div :class="camera.ptz_capable ? 'grid grid-cols-1 lg:grid-cols-3 gap-6' : 'grid grid-cols-1 lg:grid-cols-2 gap-6'">
       <!-- Camera Info -->
-      <div class="bg-nvr-card rounded-lg p-4 border border-nvr-border">
+      <div class="bg-white dark:bg-nvr-card rounded-lg p-4 border border-gray-200 dark:border-nvr-border">
         <h2 class="text-lg font-semibold mb-4">Camera Details</h2>
         <div class="space-y-3 text-sm">
           <div class="flex justify-between"><span class="text-gray-400">Protocol</span><span>{{ camera.protocol_type }}</span></div>
@@ -23,7 +23,7 @@
       </div>
 
       <!-- Detection Zones -->
-      <div class="bg-nvr-card rounded-lg p-4 border border-nvr-border">
+      <div class="bg-white dark:bg-nvr-card rounded-lg p-4 border border-gray-200 dark:border-nvr-border">
         <h2 class="text-lg font-semibold mb-4">Detection Zones</h2>
         <CameraDetectionZoneEditor
           :camera-id="camera.id"
@@ -31,7 +31,7 @@
           @saved="loadZones"
         />
         <div v-if="zones.length > 0" class="mt-4 space-y-2">
-          <div v-for="zone in zones" :key="zone.id" class="flex justify-between items-center p-2 bg-nvr-darker rounded text-sm">
+          <div v-for="zone in zones" :key="zone.id" class="flex justify-between items-center p-2 bg-gray-100 dark:bg-nvr-darker rounded text-sm">
             <span>{{ zone.name }}</span>
             <button @click="deleteZone(zone.id)" class="text-red-400 hover:underline text-xs">Delete</button>
           </div>

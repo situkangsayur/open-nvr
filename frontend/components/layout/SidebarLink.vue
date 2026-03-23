@@ -1,7 +1,7 @@
 <template>
   <NuxtLink :to="to" :class="[
     'block px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-    isActive ? 'bg-primary-600/20 text-primary-600 dark:text-primary-400' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-nvr-card',
+    isActive ? 'bg-primary-600/20 text-primary-600 dark:text-primary-400' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-white dark:bg-nvr-card',
   ]">
     {{ label }}
   </NuxtLink>

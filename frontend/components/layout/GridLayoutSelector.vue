@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-nvr-card rounded-lg p-4 border border-nvr-border">
+  <div class="bg-white dark:bg-nvr-card rounded-lg p-4 border border-gray-200 dark:border-nvr-border">
     <div class="flex items-center justify-between mb-3">
       <h3 class="text-sm font-semibold text-gray-400">Layout</h3>
       <button @click="showSave = !showSave" class="text-xs text-primary-400 hover:underline">
@@ -11,7 +11,7 @@
     <div class="flex gap-2 mb-3">
       <button v-for="preset in presets" :key="preset.cols"
         @click="$emit('change', preset.cols)"
-        :class="currentCols === preset.cols ? 'bg-primary-600 border-primary-500' : 'bg-nvr-darker border-nvr-border'"
+        :class="currentCols === preset.cols ? 'bg-primary-600 border-primary-500' : 'bg-gray-100 dark:bg-nvr-darker border-gray-200 dark:border-nvr-border'"
         class="flex-1 py-2 rounded text-xs border transition-colors text-center">
         {{ preset.label }}
       </button>
@@ -21,7 +21,7 @@
     <div v-if="layouts.length > 0" class="space-y-1 mb-3">
       <div v-for="layout in layouts" :key="layout.id"
         @click="$emit('load', layout)"
-        class="flex justify-between items-center p-2 rounded cursor-pointer hover:bg-nvr-darker text-xs">
+        class="flex justify-between items-center p-2 rounded cursor-pointer hover:bg-gray-100 dark:bg-nvr-darker text-xs">
         <span>{{ layout.name }}</span>
         <button @click.stop="deleteLayout(layout.id)" class="text-red-400 hover:underline">x</button>
       </div>
@@ -29,7 +29,7 @@
 
     <!-- Save form -->
     <div v-if="showSave" class="space-y-2">
-      <input v-model="saveName" type="text" placeholder="Layout name" class="w-full bg-nvr-darker border border-nvr-border rounded px-3 py-1.5 text-white text-xs" />
+      <input v-model="saveName" type="text" placeholder="Layout name" class="w-full bg-gray-100 dark:bg-nvr-darker border border-gray-200 dark:border-nvr-border rounded px-3 py-1.5 text-white text-xs" />
       <button @click="saveLayout" :disabled="!saveName.trim()" class="w-full bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white py-1.5 rounded text-xs transition-colors">
         Save
       </button>

@@ -2,19 +2,19 @@
   <div class="relative">
     <canvas
       ref="canvas"
-      class="w-full cursor-crosshair border border-nvr-border rounded"
+      class="w-full cursor-crosshair border border-gray-200 dark:border-nvr-border rounded"
       :width="canvasWidth"
       :height="canvasHeight"
       @click="addPoint"
       @mousemove="updateCursor"
     />
     <div class="mt-3 flex gap-2">
-      <button @click="clearPoints" class="text-xs bg-nvr-darker border border-nvr-border px-3 py-1 rounded hover:bg-nvr-border transition-colors">Clear</button>
-      <button @click="undo" :disabled="points.length === 0" class="text-xs bg-nvr-darker border border-nvr-border px-3 py-1 rounded hover:bg-nvr-border disabled:opacity-50 transition-colors">Undo</button>
+      <button @click="clearPoints" class="text-xs bg-gray-100 dark:bg-nvr-darker border border-gray-200 dark:border-nvr-border px-3 py-1 rounded hover:bg-nvr-border transition-colors">Clear</button>
+      <button @click="undo" :disabled="points.length === 0" class="text-xs bg-gray-100 dark:bg-nvr-darker border border-gray-200 dark:border-nvr-border px-3 py-1 rounded hover:bg-nvr-border disabled:opacity-50 transition-colors">Undo</button>
       <button @click="saveZone" :disabled="points.length < 3" class="text-xs bg-primary-600 px-3 py-1 rounded hover:bg-primary-700 disabled:opacity-50 transition-colors">Save Zone</button>
     </div>
     <div class="mt-2">
-      <input v-model="zoneName" type="text" placeholder="Zone name" class="w-full bg-nvr-darker border border-nvr-border rounded px-3 py-1.5 text-white text-sm" />
+      <input v-model="zoneName" type="text" placeholder="Zone name" class="w-full bg-gray-100 dark:bg-nvr-darker border border-gray-200 dark:border-nvr-border rounded px-3 py-1.5 text-white text-sm" />
     </div>
   </div>
 </template>

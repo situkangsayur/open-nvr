@@ -2,18 +2,18 @@
   <div>
     <h1 class="text-2xl font-bold mb-6">Detection Events</h1>
 
-    <div class="bg-nvr-card rounded-lg p-4 border border-nvr-border mb-6">
+    <div class="bg-white dark:bg-nvr-card rounded-lg p-4 border border-gray-200 dark:border-nvr-border mb-6">
       <div class="flex flex-wrap gap-4 items-end">
         <div>
           <label class="block text-xs text-gray-400 mb-1">Camera</label>
-          <select v-model="filter.camera_id" class="bg-nvr-darker border border-nvr-border rounded px-3 py-2 text-white text-sm">
+          <select v-model="filter.camera_id" class="bg-gray-100 dark:bg-nvr-darker border border-gray-200 dark:border-nvr-border rounded px-3 py-2 text-white text-sm">
             <option value="">All cameras</option>
             <option v-for="cam in cameras" :key="cam.id" :value="cam.id">{{ cam.name }}</option>
           </select>
         </div>
         <div>
           <label class="block text-xs text-gray-400 mb-1">Type</label>
-          <select v-model="filter.event_type" class="bg-nvr-darker border border-nvr-border rounded px-3 py-2 text-white text-sm">
+          <select v-model="filter.event_type" class="bg-gray-100 dark:bg-nvr-darker border border-gray-200 dark:border-nvr-border rounded px-3 py-2 text-white text-sm">
             <option value="">All types</option>
             <option value="motion">Motion</option>
             <option value="human">Human</option>
@@ -30,7 +30,7 @@
     <div v-if="loading" class="text-gray-400">Loading events...</div>
     <div v-else-if="events.length === 0" class="text-gray-400 text-center py-12">No events found</div>
     <div v-else class="space-y-2">
-      <div v-for="event in events" :key="event.id" class="bg-nvr-card rounded-lg p-4 border border-nvr-border flex items-center gap-4">
+      <div v-for="event in events" :key="event.id" class="bg-white dark:bg-nvr-card rounded-lg p-4 border border-gray-200 dark:border-nvr-border flex items-center gap-4">
         <div :class="eventTypeClass(event.event_type)" class="w-10 h-10 rounded-lg flex items-center justify-center text-lg flex-shrink-0">
           {{ eventIcon(event.event_type) }}
         </div>

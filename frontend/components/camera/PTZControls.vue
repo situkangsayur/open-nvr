@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-nvr-card rounded-lg p-4 border border-nvr-border">
+  <div class="bg-white dark:bg-nvr-card rounded-lg p-4 border border-gray-200 dark:border-nvr-border">
     <h3 class="text-sm font-semibold text-gray-400 mb-3">PTZ Control</h3>
     <div class="grid grid-cols-3 gap-1 w-36 mx-auto mb-3">
       <div></div>
@@ -41,6 +41,6 @@ const sendPtz = async (action: string) => {
 
 <style scoped>
 .ptz-btn {
-  @apply bg-nvr-darker border border-nvr-border rounded p-2 text-center hover:bg-primary-600/30 active:bg-primary-600 transition-colors select-none;
+  @apply bg-gray-100 dark:bg-nvr-darker border border-gray-200 dark:border-nvr-border rounded p-2 text-center hover:bg-primary-600/30 active:bg-primary-600 transition-colors select-none;
 }
 </style>

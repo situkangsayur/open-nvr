@@ -2,24 +2,24 @@
   <div>
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold">Playback</h1>
-      <button @click="showExport = true" class="bg-nvr-card dark:bg-nvr-darker hover:bg-gray-200 dark:hover:bg-nvr-border text-gray-700 dark:text-white px-4 py-2 rounded-lg border border-gray-200 dark:border-nvr-border transition-colors text-sm">
+      <button @click="showExport = true" class="bg-white dark:bg-nvr-card dark:bg-gray-100 dark:bg-nvr-darker hover:bg-gray-200 dark:hover:bg-nvr-border text-gray-700 dark:text-white px-4 py-2 rounded-lg border border-gray-200 dark:border-nvr-border transition-colors text-sm">
         Export MP4
       </button>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
       <!-- Controls -->
-      <div class="bg-nvr-card rounded-lg p-4 border border-nvr-border">
+      <div class="bg-white dark:bg-nvr-card rounded-lg p-4 border border-gray-200 dark:border-nvr-border">
         <h2 class="text-sm font-semibold text-gray-400 mb-3">Camera</h2>
-        <select v-model="selectedCamera" class="w-full bg-nvr-darker border border-nvr-border rounded px-3 py-2 text-white text-sm mb-4">
+        <select v-model="selectedCamera" class="w-full bg-gray-100 dark:bg-nvr-darker border border-gray-200 dark:border-nvr-border rounded px-3 py-2 text-white text-sm mb-4">
           <option value="">Select camera...</option>
           <option v-for="cam in cameras" :key="cam.id" :value="cam.id">{{ cam.name }}</option>
         </select>
 
         <h2 class="text-sm font-semibold text-gray-400 mb-3">Date Range</h2>
         <div class="space-y-2 mb-4">
-          <input v-model="startDate" type="datetime-local" class="w-full bg-nvr-darker border border-nvr-border rounded px-3 py-2 text-white text-sm" />
-          <input v-model="endDate" type="datetime-local" class="w-full bg-nvr-darker border border-nvr-border rounded px-3 py-2 text-white text-sm" />
+          <input v-model="startDate" type="datetime-local" class="w-full bg-gray-100 dark:bg-nvr-darker border border-gray-200 dark:border-nvr-border rounded px-3 py-2 text-white text-sm" />
+          <input v-model="endDate" type="datetime-local" class="w-full bg-gray-100 dark:bg-nvr-darker border border-gray-200 dark:border-nvr-border rounded px-3 py-2 text-white text-sm" />
         </div>
 
         <button @click="loadTimeline" :disabled="!selectedCamera" class="w-full bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white py-2 rounded-lg text-sm transition-colors">
@@ -30,8 +30,8 @@
         <div class="flex gap-2">
           <button v-for="speed in [0.5, 1, 2, 4, 8]" :key="speed"
             @click="playbackSpeed = speed"
-            :class="playbackSpeed === speed ? 'bg-primary-600' : 'bg-nvr-darker'"
-            class="flex-1 py-1 rounded text-xs border border-nvr-border">
+            :class="playbackSpeed === speed ? 'bg-primary-600' : 'bg-gray-100 dark:bg-nvr-darker'"
+            class="flex-1 py-1 rounded text-xs border border-gray-200 dark:border-nvr-border">
             {{ speed }}x
           </button>
         </div>
@@ -39,7 +39,7 @@
 
       <!-- Video + Timeline -->
       <div class="lg:col-span-3 space-y-4">
-        <div class="bg-nvr-card rounded-lg border border-nvr-border overflow-hidden">
+        <div class="bg-white dark:bg-nvr-card rounded-lg border border-gray-200 dark:border-nvr-border overflow-hidden">
           <div class="aspect-video bg-black flex items-center justify-center">
             <video ref="playbackVideo" controls class="w-full h-full object-contain" />
             <div v-if="!currentSegmentUrl" class="absolute text-gray-500 text-sm">
@@ -49,11 +49,11 @@
         </div>
 
         <!-- Timeline -->
-        <div class="bg-nvr-card rounded-lg p-4 border border-nvr-border">
+        <div class="bg-white dark:bg-nvr-card rounded-lg p-4 border border-gray-200 dark:border-nvr-border">
           <h2 class="text-sm font-semibold text-gray-400 mb-3">Timeline</h2>
           <div v-if="!timeline" class="text-gray-500 text-sm">Load a timeline first</div>
           <div v-else>
-            <div class="relative h-12 bg-nvr-darker rounded overflow-hidden">
+            <div class="relative h-12 bg-gray-100 dark:bg-nvr-darker rounded overflow-hidden">
               <!-- Recording blocks -->
               <div v-for="rec in timeline.recordings" :key="rec.recording_id"
                 @click="loadRecording(rec.recording_id)"
@@ -76,12 +76,12 @@
         </div>
 
         <!-- Recordings list -->
-        <div v-if="recordings.length > 0" class="bg-nvr-card rounded-lg p-4 border border-nvr-border">
+        <div v-if="recordings.length > 0" class="bg-white dark:bg-nvr-card rounded-lg p-4 border border-gray-200 dark:border-nvr-border">
           <h2 class="text-sm font-semibold text-gray-400 mb-3">Recordings ({{ recordings.length }})</h2>
           <div class="space-y-2 max-h-64 overflow-y-auto">
             <div v-for="rec in recordings" :key="rec.id"
               @click="loadRecording(rec.id)"
-              class="flex justify-between items-center p-2 rounded cursor-pointer hover:bg-nvr-darker transition-colors"
+              class="flex justify-between items-center p-2 rounded cursor-pointer hover:bg-gray-100 dark:bg-nvr-darker transition-colors"
               :class="currentRecordingId === rec.id ? 'bg-primary-600/20 border border-primary-500' : ''">
               <div>
                 <span class="text-sm">{{ formatDateTime(rec.start_time) }}</span>

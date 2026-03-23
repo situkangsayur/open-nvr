@@ -21,7 +21,7 @@
           <button @click="startScan" :disabled="scanning" class="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white px-6 py-2 rounded-lg transition-colors">
             {{ scanning ? 'Scanning...' : 'Scan Network' }}
           </button>
-          <button @click="pingAll" :disabled="pinging" class="bg-nvr-card dark:bg-nvr-darker hover:bg-nvr-border border border-gray-200 dark:border-nvr-border text-gray-700 dark:text-white px-4 py-2 rounded-lg transition-colors">
+          <button @click="pingAll" :disabled="pinging" class="bg-white dark:bg-nvr-card dark:bg-gray-100 dark:bg-nvr-darker hover:bg-nvr-border border border-gray-200 dark:border-nvr-border text-gray-700 dark:text-white px-4 py-2 rounded-lg transition-colors">
             {{ pinging ? 'Checking...' : 'Ping All Saved Cameras' }}
           </button>
         </div>

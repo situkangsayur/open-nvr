@@ -10,13 +10,13 @@
         <LayoutGridLayoutSelector :current-cols="gridCols" @change="gridCols = $event" />
 
         <!-- Camera list for selection -->
-        <div class="bg-nvr-card rounded-lg p-4 border border-nvr-border">
+        <div class="bg-white dark:bg-nvr-card rounded-lg p-4 border border-gray-200 dark:border-nvr-border">
           <h3 class="text-sm font-semibold text-gray-400 mb-3">Cameras</h3>
           <div class="space-y-1 max-h-64 overflow-y-auto">
             <div v-for="cam in cameras" :key="cam.id"
               @click="selectedCamera = cam"
               :class="selectedCamera?.id === cam.id ? 'bg-primary-600/20 border-primary-500' : 'border-transparent'"
-              class="flex items-center gap-2 p-2 rounded cursor-pointer hover:bg-nvr-darker text-sm border transition-colors">
+              class="flex items-center gap-2 p-2 rounded cursor-pointer hover:bg-gray-100 dark:bg-nvr-darker text-sm border transition-colors">
               <span :class="cam.status === 'online' ? 'bg-green-500' : 'bg-red-500'" class="w-2 h-2 rounded-full flex-shrink-0"></span>
               <span class="truncate">{{ cam.name }}</span>
             </div>
@@ -36,7 +36,7 @@
           <div v-for="camera in cameras" :key="camera.id"
             @click="selectedCamera = camera"
             :class="selectedCamera?.id === camera.id ? 'ring-2 ring-primary-500' : ''"
-            class="bg-nvr-card rounded-lg border border-nvr-border overflow-hidden cursor-pointer">
+            class="bg-white dark:bg-nvr-card rounded-lg border border-gray-200 dark:border-nvr-border overflow-hidden cursor-pointer">
             <div class="aspect-video bg-black flex items-center justify-center relative">
               <CameraPlayer :camera-id="camera.id" />
               <div class="absolute top-2 left-2 flex items-center gap-2">
