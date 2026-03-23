@@ -73,10 +73,12 @@ async fn export_recording(
         "note": "Download segments individually or use ffmpeg to concatenate: ffmpeg -i 'concat:seg1.mp4|seg2.mp4' -c copy output.mp4"
     });
 
+    let content_disposition = format!("attachment; filename=\"{}\"", filename);
+
     Ok((
         [
-            (header::CONTENT_TYPE, "application/json"),
-            (header::CONTENT_DISPOSITION, &format!("attachment; filename=\"{}\"", filename)),
+            (header::CONTENT_TYPE, "application/json".to_string()),
+            (header::CONTENT_DISPOSITION, content_disposition),
         ],
         serde_json::to_string_pretty(&manifest).unwrap_or_default(),
     ).into_response())
