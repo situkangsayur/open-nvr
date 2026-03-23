@@ -1,20 +1,31 @@
 export const useApi = async <T>(path: string, options?: any): Promise<T> => {
   const config = useRuntimeConfig()
-  const auth = useAuth()
+  const { token } = useAuth()
 
   const headers: Record<string, string> = {}
-  const token = auth.token.value
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
+  if (token.value) {
+    headers['Authorization'] = `Bearer ${token.value}`
   }
 
-  const response = await $fetch<T>(`${config.public.apiUrl}${path}`, {
-    ...options,
-    headers: {
-      ...headers,
-      ...options?.headers,
-    },
-  })
-
-  return response
+  try {
+    const response = await $fetch<T>(`${config.public.apiUrl}${path}`, {
+      ...options,
+      headers: {
+        ...headers,
+        ...options?.headers,
+      },
+    })
+    return response
+  } catch (e: any) {
+    // If 401, redirect to login
+    if (e?.status === 401 || e?.response?.status === 401) {
+      if (import.meta.client) {
+        localStorage.removeItem('opennvr-token')
+        localStorage.removeItem('opennvr-user')
+        localStorage.removeItem('opennvr-refresh-token')
+        navigateTo('/login')
+      }
+    }
+    throw e
+  }
 }
