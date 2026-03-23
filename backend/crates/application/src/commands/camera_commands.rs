@@ -9,6 +9,7 @@ use uuid::Uuid;
 pub struct CameraCommandService {
     camera_repo: Arc<dyn CameraRepository>,
     audit_repo: Arc<dyn AuditRepository>,
+    credential_encryptor: Option<Arc<dyn CredentialEncryptor>>,
 }
 
 impl CameraCommandService {
@@ -16,7 +17,12 @@ impl CameraCommandService {
         camera_repo: Arc<dyn CameraRepository>,
         audit_repo: Arc<dyn AuditRepository>,
     ) -> Self {
-        Self { camera_repo, audit_repo }
+        Self { camera_repo, audit_repo, credential_encryptor: None }
+    }
+
+    pub fn with_encryptor(mut self, encryptor: Arc<dyn CredentialEncryptor>) -> Self {
+        self.credential_encryptor = Some(encryptor);
+        self
     }
 
     pub async fn create_camera(
@@ -48,7 +54,22 @@ impl CameraCommandService {
                 .map_err(|e| DomainError::Validation(e))?;
         }
 
-        // TODO: encrypt credentials if username/password provided
+        // Encrypt credentials if provided
+        if let (Some(username), Some(password)) = (&req.username, &req.password) {
+            if let Some(ref encryptor) = self.credential_encryptor {
+                let credential_string = format!("{}:{}", username, password);
+                match encryptor.encrypt(&credential_string) {
+                    Ok(encrypted) => {
+                        camera.credentials_encrypted = Some(encrypted);
+                    }
+                    Err(e) => {
+                        tracing::warn!(error = %e, "Failed to encrypt credentials, storing without encryption");
+                    }
+                }
+            } else {
+                tracing::warn!("Credential encryptor not available, credentials will not be stored");
+            }
+        }
 
         self.camera_repo.create(&camera).await?;
 
@@ -95,6 +116,23 @@ impl CameraCommandService {
         if let Some(rm) = req.recording_mode {
             camera.recording_mode = rm.parse::<RecordingMode>()
                 .map_err(|e| DomainError::Validation(e))?;
+        }
+
+        // Encrypt credentials if provided
+        if let (Some(username), Some(password)) = (&req.username, &req.password) {
+            if let Some(ref encryptor) = self.credential_encryptor {
+                let credential_string = format!("{}:{}", username, password);
+                match encryptor.encrypt(&credential_string) {
+                    Ok(encrypted) => {
+                        camera.credentials_encrypted = Some(encrypted);
+                    }
+                    Err(e) => {
+                        tracing::warn!(error = %e, "Failed to encrypt credentials during update");
+                    }
+                }
+            } else {
+                tracing::warn!("Credential encryptor not available, credentials will not be updated");
+            }
         }
 
         camera.updated_at = chrono::Utc::now();

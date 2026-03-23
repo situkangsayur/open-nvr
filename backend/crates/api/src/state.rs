@@ -2,6 +2,7 @@ use open_nvr_application::commands::*;
 use open_nvr_application::queries::*;
 use open_nvr_domain::ports::*;
 use open_nvr_infrastructure::persistence::*;
+use open_nvr_worker::manager::CameraManager;
 use open_nvr_worker::recording::LiveFrame;
 use sqlx::PgPool;
 use std::sync::Arc;
@@ -20,6 +21,7 @@ pub struct AppState {
     pub event_repo: Arc<dyn DetectionEventRepository>,
     pub layout_repo: Arc<dyn GridLayoutRepository>,
     pub retention_repo: Arc<dyn RetentionPolicyRepository>,
+    pub camera_manager: Option<Arc<CameraManager>>,
     pub db_pool: PgPool,
     pub live_tx: broadcast::Sender<LiveFrame>,
 }
@@ -37,10 +39,35 @@ impl AppState {
         let layout_repo = Arc::new(PgGridLayoutRepository::new(pool.clone()));
         let retention_repo = Arc::new(PgRetentionPolicyRepository::new(pool.clone()));
 
-        let camera_commands = Arc::new(CameraCommandService::new(
+        // Extra clones for CameraManager (needs its own repo handles)
+        let camera_repo2 = Arc::new(PgCameraRepository::new(pool.clone()));
+        let recording_repo2 = Arc::new(PgRecordingRepository::new(pool.clone()));
+        let segment_repo2 = Arc::new(PgRecordingSegmentRepository::new(pool.clone()));
+        let event_repo2 = Arc::new(PgDetectionEventRepository::new(pool.clone()));
+        let zone_repo2 = Arc::new(PgDetectionZoneRepository::new(pool.clone()));
+
+        // Initialize credential encryptor if env var is set
+        let credential_encryptor: Option<Arc<dyn CredentialEncryptor>> = match
+            open_nvr_infrastructure::crypto::credentials::CredentialEncryptor::from_env()
+        {
+            Ok(enc) => {
+                tracing::info!("Credential encryption enabled");
+                Some(Arc::new(enc))
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "Credential encryption not available - credentials will not be encrypted");
+                None
+            }
+        };
+
+        let mut camera_cmd_service = CameraCommandService::new(
             camera_repo.clone() as Arc<dyn CameraRepository>,
             audit_repo.clone() as Arc<dyn AuditRepository>,
-        ));
+        );
+        if let Some(enc) = credential_encryptor {
+            camera_cmd_service = camera_cmd_service.with_encryptor(enc);
+        }
+        let camera_commands = Arc::new(camera_cmd_service);
 
         let camera_queries = Arc::new(CameraQueryService::new(
             camera_repo as Arc<dyn CameraRepository>,
@@ -64,6 +91,16 @@ impl AppState {
 
         let (live_tx, _) = broadcast::channel(1024);
 
+        let camera_manager = Some(Arc::new(CameraManager::new(
+            camera_repo2 as Arc<dyn CameraRepository>,
+            recording_repo2 as Arc<dyn RecordingRepository>,
+            segment_repo2 as Arc<dyn RecordingSegmentRepository>,
+            event_repo2 as Arc<dyn DetectionEventRepository>,
+            zone_repo2 as Arc<dyn DetectionZoneRepository>,
+            None, // ObjectStorage - will be connected when MinIO env is set
+            live_tx.clone(),
+        )));
+
         Self {
             camera_commands,
             camera_queries,
@@ -76,6 +113,7 @@ impl AppState {
             event_repo: event_repo as Arc<dyn DetectionEventRepository>,
             layout_repo: layout_repo as Arc<dyn GridLayoutRepository>,
             retention_repo: retention_repo as Arc<dyn RetentionPolicyRepository>,
+            camera_manager,
             db_pool: pool,
             live_tx,
         }

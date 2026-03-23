@@ -98,6 +98,22 @@ services:
     networks:
       - opennvr-network
 
+  nats:
+    image: nats:2
+    container_name: opennvr-nats
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    command: ["--jetstream", "--http_port", "8222"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8222/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - opennvr-network
+
   # Optional: OpenSearch for log analysis
   # Start with: docker compose --profile logging up -d
   opensearch:

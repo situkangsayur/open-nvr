@@ -78,8 +78,8 @@
 </template>
 
 <script setup lang="ts">
-const cameras = ref<any[]>([])
-const loading = ref(true)
+const cameraStore = useCameraStore()
+const { success, error: showError } = useToast()
 const showAddModal = ref(false)
 const newCamera = ref({
   name: '',
@@ -91,35 +91,29 @@ const newCamera = ref({
   connection_type: 'ethernet',
 })
 
-const loadCameras = async () => {
-  loading.value = true
-  try {
-    cameras.value = await useApi<any[]>('/api/cameras')
-  } catch (e) {
-    console.error('Failed to load cameras', e)
-  } finally {
-    loading.value = false
-  }
-}
+const cameras = computed(() => cameraStore.cameras)
+const loading = computed(() => cameraStore.loading)
+
+const loadCameras = () => cameraStore.fetchAll()
 
 const addCamera = async () => {
   try {
-    await useApi('/api/cameras', { method: 'POST', body: newCamera.value })
+    await cameraStore.create(newCamera.value)
     showAddModal.value = false
     newCamera.value = { name: '', protocol_type: 'rtsp', stream_url: '', username: '', password: '', brand: '', connection_type: 'ethernet' }
-    await loadCameras()
+    success('Camera added successfully')
   } catch (e) {
-    console.error('Failed to add camera', e)
+    showError('Failed to add camera')
   }
 }
 
 const deleteCamera = async (id: string) => {
   if (!confirm('Delete this camera?')) return
   try {
-    await useApi(`/api/cameras/${id}`, { method: 'DELETE' })
-    await loadCameras()
+    await cameraStore.remove(id)
+    success('Camera deleted')
   } catch (e) {
-    console.error('Failed to delete camera', e)
+    showError('Failed to delete camera')
   }
 }
 

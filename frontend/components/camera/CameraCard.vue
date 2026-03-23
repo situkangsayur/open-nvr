@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-nvr-card rounded-lg border border-nvr-border overflow-hidden">
+  <div class="bg-white dark:bg-nvr-card rounded-lg border border-gray-200 dark:border-nvr-border overflow-hidden">
     <div class="aspect-video bg-black flex items-center justify-center">
       <span class="text-gray-600 text-sm">Preview</span>
     </div>
@@ -8,7 +8,7 @@
         <h3 class="font-medium text-sm truncate">{{ camera.name }}</h3>
         <span :class="statusClass" class="w-2 h-2 rounded-full flex-shrink-0 ml-2"></span>
       </div>
-      <div class="text-xs text-gray-400 space-y-0.5">
+      <div class="text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
         <div>{{ camera.protocol_type }} &middot; {{ camera.connection_type }}</div>
         <div v-if="camera.brand">{{ camera.brand }} {{ camera.model || '' }}</div>
       </div>

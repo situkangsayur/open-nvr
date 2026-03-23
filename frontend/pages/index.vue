@@ -31,11 +31,37 @@
         </div>
       </div>
     </div>
+
+    <!-- System Info -->
+    <div class="bg-nvr-card rounded-lg p-4 border border-nvr-border mt-6">
+      <h2 class="text-lg font-semibold mb-4">System Information</h2>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+        <div>
+          <span class="text-gray-400">Keycloak</span>
+          <p class="text-primary-400">{{ config.public.keycloakUrl }}</p>
+        </div>
+        <div>
+          <span class="text-gray-400">API</span>
+          <p class="text-primary-400">{{ config.public.apiUrl }}</p>
+        </div>
+        <div>
+          <span class="text-gray-400">Cameras</span>
+          <p>{{ stats.totalCameras }} configured</p>
+        </div>
+        <div>
+          <span class="text-gray-400">Alerts</span>
+          <p :class="stats.unresolvedAlerts > 0 ? 'text-red-400' : 'text-green-400'">
+            {{ stats.unresolvedAlerts }} unresolved
+          </p>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 const { $api } = useNuxtApp()
+const config = useRuntimeConfig()
 const stats = ref({ totalCameras: 0, onlineCameras: 0, offlineCameras: 0, unresolvedAlerts: 0 })
 const auditLogs = ref<any[]>([])
 const networkEvents = ref<any[]>([])

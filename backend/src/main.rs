@@ -2,8 +2,10 @@ use axum::middleware as axum_middleware;
 use open_nvr_api::middleware::security_headers::security_headers_middleware;
 use open_nvr_api::routes::create_router;
 use open_nvr_api::state::AppState;
+use open_nvr_domain::ports::CameraRepository;
 use open_nvr_infrastructure::persistence;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::trace::TraceLayer;
 use axum::http::{HeaderName, HeaderValue, Method};
@@ -32,7 +34,37 @@ async fn main() -> anyhow::Result<()> {
 
     info!("Database migrations applied successfully");
 
-    let state = AppState::new(pool);
+    let state = AppState::new(pool.clone());
+
+    // Initialize NATS broker (optional)
+    let nats = open_nvr_infrastructure::messaging::nats_broker::OptionalNats::from_env().await;
+    if nats.is_connected() {
+        info!("NATS message broker connected");
+    } else {
+        info!("Running without NATS message broker");
+    }
+
+    // Start background workers
+    let state_clone = state.clone();
+    tokio::spawn(async move {
+        // Start all cameras with recording enabled
+        if let Some(ref mgr) = state_clone.camera_manager {
+            info!("Starting camera manager - loading cameras...");
+            mgr.start_all().await;
+            let running = mgr.running_count().await;
+            info!(running = running, "Camera manager initialized");
+        }
+    });
+
+    // Health monitor
+    let health_camera_repo = Arc::new(
+        open_nvr_infrastructure::persistence::PgCameraRepository::new(pool),
+    );
+    tokio::spawn(open_nvr_worker::health::camera_health_monitor(
+        health_camera_repo as Arc<dyn CameraRepository>,
+    ));
+
+    info!("Background workers started");
 
     let allowed_origins = std::env::var("CORS_ALLOWED_ORIGINS")
         .unwrap_or_else(|_| "http://localhost:3000".to_string());

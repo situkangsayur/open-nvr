@@ -5,6 +5,7 @@ mod streaming;
 mod discovery;
 mod detection;
 mod audit;
+mod crypto;
 
 pub use repository::*;
 pub use storage::*;
@@ -13,3 +14,4 @@ pub use streaming::*;
 pub use discovery::*;
 pub use detection::*;
 pub use audit::*;
+pub use crypto::*;

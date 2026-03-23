@@ -23,6 +23,7 @@ bytes = { workspace = true }
 tokio-stream = "0.1"
 url = "2"
 futures-util = "0.3"
+async-nats = "0.38"
 
 [features]
 default = []

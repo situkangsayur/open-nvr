@@ -1,4 +1,5 @@
 mod camera;
+mod camera_ops;
 mod discovery;
 mod events;
 mod group;
@@ -19,6 +20,7 @@ use crate::state::AppState;
 pub fn create_router(state: AppState) -> Router {
     let ws_routes = Router::new()
         .route("/ws/stream/{camera_id}", get(crate::ws::stream::ws_stream_handler))
+        .route("/ws/events", get(crate::ws::events::ws_events_handler))
         .with_state(state.clone());
 
     Router::new()
@@ -30,6 +32,7 @@ pub fn create_router(state: AppState) -> Router {
 fn api_routes(state: AppState) -> Router {
     Router::new()
         .merge(camera::routes(state.clone()))
+        .merge(camera_ops::routes(state.clone()))
         .merge(discovery::routes(state.clone()))
         .merge(group::routes(state.clone()))
         .merge(audit::routes(state.clone()))
