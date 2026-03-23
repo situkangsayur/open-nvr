@@ -54,18 +54,28 @@
         <div v-for="(device, idx) in devices" :key="device.ip" class="p-4">
           <div class="flex items-start justify-between gap-4">
             <div class="flex-1">
-              <div class="font-medium">{{ device.ip }}</div>
+              <div class="flex items-center gap-2">
+                <span class="font-medium">{{ device.ip }}</span>
+                <!-- Device type badge -->
+                <span :class="deviceTypeClass(device)" class="text-[10px] px-1.5 py-0.5 rounded font-medium">
+                  {{ deviceType(device) }}
+                </span>
+                <!-- Already added badge -->
+                <span v-if="isAlreadyAdded(device)" class="text-[10px] bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded">
+                  Added
+                </span>
+              </div>
               <div class="text-sm text-gray-500 dark:text-gray-400">
                 <span v-if="device.brand" class="text-primary-500 dark:text-primary-400 mr-2">{{ device.brand }}</span>
                 <span v-if="device.mac">MAC: {{ device.mac }}</span>
-                <span class="ml-2">Protocols: {{ device.protocols.join(', ') }}</span>
+                <span v-if="device.protocols.length" class="ml-2">{{ device.protocols.join(', ') }}</span>
               </div>
               <div v-if="device.rtsp_url" class="text-xs text-gray-400 dark:text-gray-500 mt-1">RTSP: {{ device.rtsp_url }}</div>
             </div>
 
             <!-- Quick add or customize -->
             <div class="flex items-center gap-2 flex-shrink-0">
-              <div v-if="!device.showEdit">
+              <div v-if="!device.showEdit && !isAlreadyAdded(device)">
                 <button @click="quickAdd(device)" class="bg-primary-600 hover:bg-primary-700 text-white text-sm px-3 py-1.5 rounded transition-colors">
                   Quick Add
                 </button>
@@ -73,6 +83,7 @@
                   Customize
                 </button>
               </div>
+              <span v-else-if="isAlreadyAdded(device)" class="text-xs text-gray-400">Already in system</span>
             </div>
           </div>
 
@@ -149,6 +160,42 @@ const pinging = ref(false)
 const testUrl = ref('')
 const testing = ref(false)
 const testResult = ref<any>(null)
+const existingCameras = ref<any[]>([])
+
+// Load existing cameras to mark duplicates
+onMounted(async () => {
+  try {
+    existingCameras.value = await useApi<any[]>('/api/cameras')
+  } catch {}
+})
+
+// Check if device IP is already added as a camera
+const isAlreadyAdded = (device: any) => {
+  const ip = String(device.ip)
+  return existingCameras.value.some(c => c.stream_url?.includes(ip))
+}
+
+// Detect device type from protocols/ports/brand
+const deviceType = (device: any) => {
+  const p = device.protocols || []
+  const brand = (device.brand || '').toLowerCase()
+  if (p.includes('rtsp') || brand.includes('v360') || brand.includes('hikvision') || brand.includes('dahua') || brand.includes('reolink')) return 'Camera'
+  if (p.includes('onvif')) return 'Camera'
+  if (brand.includes('tp-link') || brand.includes('router')) return 'Router'
+  if (p.length === 0 && !device.brand) return 'Device'
+  if (p.includes('http') && !p.includes('rtsp')) return 'Web Device'
+  return 'Device'
+}
+
+const deviceTypeClass = (device: any) => {
+  const type = deviceType(device)
+  switch (type) {
+    case 'Camera': return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+    case 'Router': return 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400'
+    case 'Web Device': return 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400'
+    default: return 'bg-gray-100 dark:bg-gray-700/30 text-gray-600 dark:text-gray-400'
+  }
+}
 
 // Use store state (persists across navigation)
 const subnets = computed({

@@ -1,44 +1,29 @@
 <template>
   <div class="w-full h-full bg-black relative overflow-hidden">
-    <!-- Live snapshot feed (polling mode) -->
+    <!-- Live snapshot feed -->
     <img
-      v-if="snapshotSrc"
-      :src="snapshotSrc"
+      v-if="currentSrc"
+      :src="currentSrc"
       class="w-full h-full object-contain"
+      @load="onImageLoad"
       @error="onImageError"
     />
 
-    <!-- Loading / connecting state -->
-    <div v-if="!snapshotSrc && loading" class="absolute inset-0 flex items-center justify-center">
-      <div class="text-gray-500 text-sm">Connecting to {{ camera.name }}...</div>
+    <!-- Loading -->
+    <div v-if="!currentSrc && loading" class="absolute inset-0 flex items-center justify-center">
+      <div class="text-gray-500 text-sm animate-pulse">{{ camera.name }}...</div>
     </div>
 
-    <!-- Offline / error state -->
-    <div v-if="!snapshotSrc && !loading" class="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
-      <div class="text-gray-600 text-sm mb-2">{{ camera.name }}</div>
-      <div class="text-gray-500 text-xs mb-1">{{ camera.status }} &middot; {{ camera.protocol_type }}</div>
-      <div class="text-gray-600 text-xs mb-3 break-all max-w-xs">{{ camera.stream_url }}</div>
-      <div v-if="errorMsg" class="text-yellow-500/80 text-xs mb-3">{{ errorMsg }}</div>
-      <button @click="startPolling" class="text-xs bg-primary-600 hover:bg-primary-700 text-white px-3 py-1.5 rounded transition-colors">
-        Retry
-      </button>
+    <!-- Offline -->
+    <div v-if="!currentSrc && !loading" class="absolute inset-0 flex flex-col items-center justify-center p-3 text-center">
+      <div class="text-gray-500 text-sm mb-1">{{ camera.name }}</div>
+      <div class="text-gray-600 text-xs mb-2">{{ errorMsg || 'Offline' }}</div>
+      <button @click="start" class="text-xs bg-primary-600 hover:bg-primary-700 text-white px-3 py-1 rounded">Retry</button>
     </div>
 
-    <!-- Live badge -->
-    <div v-if="snapshotSrc" class="absolute bottom-2 right-2">
-      <span class="text-xs bg-black/70 px-2 py-0.5 rounded font-medium" :class="isLive ? 'text-green-400' : 'text-yellow-400'">
-        {{ isLive ? 'LIVE' : 'PAUSED' }}
-      </span>
-    </div>
-
-    <!-- Camera name overlay -->
-    <div v-if="snapshotSrc" class="absolute top-2 left-2">
-      <span class="text-xs text-white bg-black/60 px-2 py-0.5 rounded">{{ camera.name }}</span>
-    </div>
-
-    <!-- FPS indicator -->
-    <div v-if="snapshotSrc" class="absolute top-2 right-2">
-      <span class="text-xs text-gray-400 bg-black/60 px-1.5 py-0.5 rounded">{{ fps }}fps</span>
+    <!-- LIVE badge -->
+    <div v-if="currentSrc && isLive" class="absolute bottom-1.5 right-1.5">
+      <span class="text-[10px] bg-red-600 text-white px-1.5 py-0.5 rounded font-bold">LIVE</span>
     </div>
   </div>
 </template>
@@ -47,102 +32,85 @@
 const props = defineProps<{ camera: any }>()
 const config = useRuntimeConfig()
 
-const snapshotSrc = ref('')
+const currentSrc = ref('')
+const nextSrc = ref('')
 const loading = ref(false)
-const errorMsg = ref('')
 const isLive = ref(false)
-const fps = ref(0)
+const errorMsg = ref('')
 
-let pollInterval: ReturnType<typeof setInterval> | null = null
-let frameCount = 0
-let fpsInterval: ReturnType<typeof setInterval> | null = null
-let lastFrameTime = 0
+let pollTimer: ReturnType<typeof setTimeout> | null = null
+let failCount = 0
 
 onMounted(() => {
-  if (props.camera.status === 'online') {
-    startPolling()
-  } else {
-    errorMsg.value = 'Camera offline'
-  }
+  if (props.camera.status === 'online') start()
+  else errorMsg.value = 'Camera offline'
 })
 
-onUnmounted(() => {
-  stopPolling()
+onUnmounted(() => stop())
+
+watch(() => props.camera.status, (s) => {
+  if (s === 'online' && !pollTimer) start()
+  else if (s !== 'online') { stop(); errorMsg.value = 'Camera offline' }
 })
 
-// Watch for camera status changes
-watch(() => props.camera.status, (newStatus) => {
-  if (newStatus === 'online' && !pollInterval) {
-    startPolling()
-  } else if (newStatus !== 'online') {
-    stopPolling()
-    errorMsg.value = 'Camera offline'
-  }
-})
-
-function startPolling() {
-  stopPolling()
+function start() {
+  stop()
   loading.value = true
   errorMsg.value = ''
-  frameCount = 0
-
-  // Grab first frame
-  grabFrame()
-
-  // Poll every 1 second for "live" feed
-  pollInterval = setInterval(grabFrame, 1000)
-
-  // Calculate FPS every 3 seconds
-  fpsInterval = setInterval(() => {
-    fps.value = Math.round(frameCount / 3)
-    frameCount = 0
-  }, 3000)
+  failCount = 0
+  grabNext()
 }
 
-function stopPolling() {
-  if (pollInterval) { clearInterval(pollInterval); pollInterval = null }
-  if (fpsInterval) { clearInterval(fpsInterval); fpsInterval = null }
+function stop() {
+  if (pollTimer) { clearTimeout(pollTimer); pollTimer = null }
   isLive.value = false
 }
 
-async function grabFrame() {
+async function grabNext() {
   try {
-    const timestamp = Date.now()
-    const url = `${config.public.apiUrl}/api/cameras/${props.camera.id}/snapshot?t=${timestamp}`
+    const url = `${config.public.apiUrl}/api/cameras/${props.camera.id}/snapshot?t=${Date.now()}`
+    const resp = await fetch(url)
+    if (resp.ok && resp.headers.get('content-type')?.includes('image')) {
+      const blob = await resp.blob()
+      const objUrl = URL.createObjectURL(blob)
 
-    const response = await fetch(url)
-    if (response.ok && response.headers.get('content-type')?.includes('image')) {
-      const blob = await response.blob()
+      // Swap: revoke old, show new
+      const old = currentSrc.value
+      currentSrc.value = objUrl
+      if (old) URL.revokeObjectURL(old)
 
-      // Revoke old URL to prevent memory leak
-      if (snapshotSrc.value) {
-        URL.revokeObjectURL(snapshotSrc.value)
-      }
-
-      snapshotSrc.value = URL.createObjectURL(blob)
       loading.value = false
       isLive.value = true
-      errorMsg.value = ''
-      frameCount++
-      lastFrameTime = timestamp
+      failCount = 0
+
+      // Schedule next grab immediately (pipeline: grab while displaying)
+      pollTimer = setTimeout(grabNext, 500)
     } else {
-      handleError('Camera not responding')
+      fail('No image')
     }
-  } catch (e) {
-    handleError('Connection failed')
+  } catch {
+    fail('Fetch failed')
   }
 }
 
-function handleError(msg: string) {
+function fail(msg: string) {
+  failCount++
   loading.value = false
-  if (Date.now() - lastFrameTime > 10000) {
-    // No frame for 10 seconds
+  if (failCount > 5) {
     isLive.value = false
     errorMsg.value = msg
+    // Slow retry
+    pollTimer = setTimeout(grabNext, 10000)
+  } else {
+    pollTimer = setTimeout(grabNext, 2000)
   }
+}
+
+function onImageLoad() {
+  // Image displayed successfully
 }
 
 function onImageError() {
-  // Image failed to load, will retry on next poll
+  // Will be retried on next poll
 }
 </script>
