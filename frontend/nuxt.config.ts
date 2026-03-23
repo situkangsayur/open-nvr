@@ -19,8 +19,18 @@ export default defineNuxtConfig({
   app: {
     head: {
       title: 'Open-NVR',
+      link: [
+        { rel: 'manifest', href: '/manifest.json' },
+        { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+        { rel: 'icon', type: 'image/png', href: '/icon-192.png' },
+        { rel: 'apple-touch-icon', href: '/icon-192.png' },
+      ],
       meta: [
         { name: 'description', content: 'Open Source Network Video Recorder' },
+        { name: 'theme-color', content: '#1e40af' },
+        { name: 'apple-mobile-web-app-capable', content: 'yes' },
+        { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
+        { name: 'viewport', content: 'width=device-width, initial-scale=1, maximum-scale=1' },
       ],
     },
   },

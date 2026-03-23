@@ -88,7 +88,6 @@
 </template>
 
 <script setup lang="ts">
-const config = useRuntimeConfig()
 const { token, user } = useAuth()
 
 const form = ref({
@@ -118,71 +117,32 @@ const changePassword = async () => {
     errorMsg.value = 'New passwords do not match'
     return
   }
-
   if (form.value.newPassword.length < 8) {
     errorMsg.value = 'Password must be at least 8 characters'
     return
   }
-
   if (form.value.newPassword === form.value.currentPassword) {
-    errorMsg.value = 'New password must be different from current password'
+    errorMsg.value = 'New password must be different'
     return
   }
 
   loading.value = true
-
   try {
-    // Step 1: Verify current password by getting a fresh token
-    const tokenUrl = `${config.public.keycloakUrl}/realms/${config.public.keycloakRealm}/protocol/openid-connect/token`
-
-    const verifyBody = new URLSearchParams({
-      grant_type: 'password',
-      client_id: config.public.keycloakClientId,
-      username: userInfo.value.username,
-      password: form.value.currentPassword,
-      scope: 'openid',
-    })
-
-    let accessToken: string
-    try {
-      const verifyResp = await $fetch<any>(tokenUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: verifyBody.toString(),
-      })
-      accessToken = verifyResp.access_token
-    } catch {
-      errorMsg.value = 'Current password is incorrect'
-      loading.value = false
-      return
-    }
-
-    // Step 2: Change password via Keycloak Account API
-    const accountUrl = `${config.public.keycloakUrl}/realms/${config.public.keycloakRealm}/account/credentials/password`
-
-    await $fetch(accountUrl, {
+    await useApi('/api/user/change-password', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
+      body: {
+        current_password: form.value.currentPassword,
+        new_password: form.value.newPassword,
       },
-      body: JSON.stringify({
-        currentPassword: form.value.currentPassword,
-        newPassword: form.value.newPassword,
-        confirmation: form.value.confirmPassword,
-      }),
     })
-
-    successMsg.value = 'Password updated successfully!'
+    successMsg.value = 'Password changed successfully!'
     form.value = { currentPassword: '', newPassword: '', confirmPassword: '' }
   } catch (e: any) {
-    const msg = e?.data?.error_description || e?.data?.errorMessage || e?.message || ''
-    if (msg.includes('Invalid existing')) {
+    const msg = e?.data?.error?.message || e?.message || ''
+    if (msg.includes('incorrect') || msg.includes('Authentication')) {
       errorMsg.value = 'Current password is incorrect'
-    } else if (msg.includes('policy')) {
-      errorMsg.value = 'Password does not meet the security policy requirements'
     } else {
-      errorMsg.value = msg || 'Failed to update password. Please try again.'
+      errorMsg.value = msg || 'Failed to change password'
     }
   } finally {
     loading.value = false
