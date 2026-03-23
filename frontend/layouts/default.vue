@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen bg-gray-50 text-gray-900 dark:bg-nvr-darker dark:text-gray-100 flex">
     <LayoutSidebar />
-    <main class="flex-1 lg:ml-64">
+    <main class="flex-1 transition-all" :class="sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'">
       <div class="p-6">
         <slot />
       </div>
@@ -9,3 +9,8 @@
     <LayoutToastContainer />
   </div>
 </template>
+
+<script setup lang="ts">
+const sidebarCollapsed = ref(false)
+provide('sidebarCollapsed', sidebarCollapsed)
+</script>

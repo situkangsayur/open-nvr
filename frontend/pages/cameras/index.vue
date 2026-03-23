@@ -15,6 +15,22 @@
       </div>
     </div>
 
+    <!-- Quick Add by IP -->
+    <div class="bg-white dark:bg-nvr-card rounded-lg p-4 border border-gray-200 dark:border-nvr-border mb-4">
+      <div class="flex gap-3 items-end">
+        <div class="flex-1">
+          <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Quick Add Camera by IP</label>
+          <input v-model="quickIp" type="text" placeholder="192.168.1.103" class="w-full bg-gray-50 dark:bg-nvr-darker border border-gray-200 dark:border-nvr-border rounded px-3 py-2 text-gray-900 dark:text-white text-sm" />
+        </div>
+        <div>
+          <input v-model="quickName" type="text" placeholder="Camera name" class="w-full bg-gray-50 dark:bg-nvr-darker border border-gray-200 dark:border-nvr-border rounded px-3 py-2 text-gray-900 dark:text-white text-sm" />
+        </div>
+        <button @click="quickAddByIp" :disabled="!quickIp" class="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white px-4 py-2 rounded text-sm transition-colors whitespace-nowrap">
+          Add
+        </button>
+      </div>
+    </div>
+
     <div v-if="loading" class="text-gray-400">Loading cameras...</div>
     <div v-else-if="cameras.length === 0" class="text-gray-400 text-center py-12">
       No cameras configured. Add one or use discovery.
@@ -94,11 +110,35 @@ const newCamera = ref({
   connection_type: 'ethernet',
 })
 
+const quickIp = ref('')
+const quickName = ref('')
 const pinging = ref(false)
 const cameras = computed(() => cameraStore.cameras)
 const loading = computed(() => cameraStore.loading)
 
 const loadCameras = () => cameraStore.fetchAll()
+
+const quickAddByIp = async () => {
+  if (!quickIp.value) return
+  const name = quickName.value || `Camera ${quickIp.value}`
+  try {
+    await useApi('/api/cameras', {
+      method: 'POST',
+      body: {
+        name,
+        protocol_type: 'rtsp',
+        stream_url: `rtsp://${quickIp.value}:554/stream1`,
+        connection_type: 'ethernet',
+      },
+    })
+    quickIp.value = ''
+    quickName.value = ''
+    await loadCameras()
+    success(`Camera "${name}" added`)
+  } catch {
+    showError('Failed to add camera')
+  }
+}
 
 const pingAll = async () => {
   pinging.value = true
