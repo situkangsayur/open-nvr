@@ -1,4 +1,5 @@
 mod camera;
+mod discovery;
 mod events;
 mod group;
 mod health;
@@ -29,6 +30,7 @@ pub fn create_router(state: AppState) -> Router {
 fn api_routes(state: AppState) -> Router {
     Router::new()
         .merge(camera::routes(state.clone()))
+        .merge(discovery::routes(state.clone()))
         .merge(group::routes(state.clone()))
         .merge(audit::routes(state.clone()))
         .merge(storage::routes())
