@@ -9,6 +9,7 @@ mod health;
 mod audit;
 mod storage;
 mod recording;
+mod recording_files;
 mod timeline;
 mod zones;
 mod ptz;
@@ -43,6 +44,7 @@ fn api_routes(state: AppState) -> Router {
         .merge(audit::routes(state.clone()))
         .merge(storage::routes())
         .merge(recording::routes(state.clone()))
+        .merge(recording_files::routes(state.clone()))
         .merge(timeline::routes(state.clone()))
         .merge(zones::routes(state.clone()))
         .merge(events::routes(state.clone()))
