@@ -76,15 +76,71 @@ async fn ptz_command(
     }));
     let _ = state.audit_repo.log(&audit).await;
 
-    // TODO: Send actual PTZ command via ONVIF when protocol adapter supports it
-    tracing::info!(camera_id = %camera_id, action = %cmd.action, "PTZ command");
+    // Build ONVIF SOAP request for PTZ control
+    let camera_ip = extract_camera_ip(&camera.stream_url);
+    let onvif_url = format!("http://{}:8899/onvif/PTZ", camera_ip);
 
-    Ok(Json(serde_json::json!({
-        "status": "ok",
-        "camera_id": camera_id,
-        "action": cmd.action,
-        "speed": cmd.speed.unwrap_or(0.5),
-    })))
+    let soap_body = match cmd.action.as_str() {
+        "pan_left" => format!(r#"<tptz:ContinuousMove><tptz:ProfileToken>stream0_0</tptz:ProfileToken><tptz:Velocity><tt:PanTilt x="-{}" y="0"/></tptz:Velocity></tptz:ContinuousMove>"#, cmd.speed.unwrap_or(0.5)),
+        "pan_right" => format!(r#"<tptz:ContinuousMove><tptz:ProfileToken>stream0_0</tptz:ProfileToken><tptz:Velocity><tt:PanTilt x="{}" y="0"/></tptz:Velocity></tptz:ContinuousMove>"#, cmd.speed.unwrap_or(0.5)),
+        "tilt_up" => format!(r#"<tptz:ContinuousMove><tptz:ProfileToken>stream0_0</tptz:ProfileToken><tptz:Velocity><tt:PanTilt x="0" y="{}"/></tptz:Velocity></tptz:ContinuousMove>"#, cmd.speed.unwrap_or(0.5)),
+        "tilt_down" => format!(r#"<tptz:ContinuousMove><tptz:ProfileToken>stream0_0</tptz:ProfileToken><tptz:Velocity><tt:PanTilt x="0" y="-{}"/></tptz:Velocity></tptz:ContinuousMove>"#, cmd.speed.unwrap_or(0.5)),
+        "zoom_in" => format!(r#"<tptz:ContinuousMove><tptz:ProfileToken>stream0_0</tptz:ProfileToken><tptz:Velocity><tt:Zoom x="{}"/></tptz:Velocity></tptz:ContinuousMove>"#, cmd.speed.unwrap_or(0.5)),
+        "zoom_out" => format!(r#"<tptz:ContinuousMove><tptz:ProfileToken>stream0_0</tptz:ProfileToken><tptz:Velocity><tt:Zoom x="-{}"/></tptz:Velocity></tptz:ContinuousMove>"#, cmd.speed.unwrap_or(0.5)),
+        "stop" => r#"<tptz:Stop><tptz:ProfileToken>stream0_0</tptz:ProfileToken><tptz:PanTilt>true</tptz:PanTilt><tptz:Zoom>true</tptz:Zoom></tptz:Stop>"#.to_string(),
+        "home" => r#"<tptz:GotoHomePosition><tptz:ProfileToken>stream0_0</tptz:ProfileToken></tptz:GotoHomePosition>"#.to_string(),
+        _ => return Err(open_nvr_domain::errors::DomainError::Validation("Invalid PTZ action".into()).into()),
+    };
+
+    let soap_envelope = format!(r#"<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:tptz="http://www.onvif.org/ver20/ptz/wsdl" xmlns:tt="http://www.onvif.org/ver10/schema">
+  <s:Body>{}</s:Body>
+</s:Envelope>"#, soap_body);
+
+    let client = reqwest::Client::new();
+    let resp = client.post(&onvif_url)
+        .header("Content-Type", "application/soap+xml")
+        .body(soap_envelope)
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await;
+
+    let ptz_success = match &resp {
+        Ok(r) => r.status().is_success(),
+        Err(e) => {
+            tracing::warn!(camera_id = %camera_id, error = %e, "PTZ ONVIF request failed");
+            false
+        }
+    };
+
+    tracing::info!(camera_id = %camera_id, action = %cmd.action, success = ptz_success, "PTZ command sent via ONVIF");
+
+    if ptz_success {
+        Ok(Json(serde_json::json!({
+            "status": "ok",
+            "camera_id": camera_id,
+            "action": cmd.action,
+            "speed": cmd.speed.unwrap_or(0.5),
+        })))
+    } else {
+        Ok(Json(serde_json::json!({
+            "status": "error",
+            "camera_id": camera_id,
+            "action": cmd.action,
+            "message": "PTZ command failed - camera may be unreachable",
+        })))
+    }
+}
+
+/// Extract camera IP from RTSP URL like `rtsp://user:pass@192.168.1.10:554/path`
+fn extract_camera_ip(stream_url: &str) -> String {
+    stream_url
+        .split("://").nth(1)
+        .and_then(|s| s.split('@').last())
+        .and_then(|s| s.split(':').next())
+        .and_then(|s| s.split('/').next())
+        .unwrap_or("0.0.0.0")
+        .to_string()
 }
 
 async fn goto_preset(

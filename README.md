@@ -102,16 +102,29 @@ See `scripts/deploy.sh` for full deployment automation.
 
 ## Camera Support
 
-| Brand | Protocol | Auto-Discover |
-|-------|----------|--------------|
-| Hikvision | RTSP, ONVIF | Yes (MAC OUI) |
-| Dahua | RTSP, ONVIF | Yes (MAC OUI) |
-| Reolink | RTSP | Yes (MAC OUI) |
-| TP-Link Tapo | RTSP | Yes |
-| V360 Pro / XMEye | RTSP (needs enabling) | Yes (MAC OUI) |
-| Imou | RTSP (needs enabling) | Yes (MAC OUI) |
-| ESP32-CAM | MJPEG | Yes (HTTP) |
-| Generic ONVIF | ONVIF + RTSP | Yes (WS-Discovery) |
+| Brand | Protocol | Auto-Discover | Notes |
+|-------|----------|--------------|-------|
+| Hikvision | RTSP, ONVIF | Yes (MAC OUI) | |
+| Dahua | RTSP, ONVIF | Yes (MAC OUI) | |
+| Reolink | RTSP | Yes (MAC OUI) | |
+| TP-Link Tapo | RTSP | Yes | |
+| V360 Pro / XMEye | RTSP + ONVIF PTZ | Yes (MAC OUI + ONVIF) | ONVIF port 8899, PTZ via ContinuousMove. Audio not available via RTSP (P2P only). Best URL: /live/ch00_1 |
+| Imou | RTSP (needs enabling) | Yes (MAC OUI) | |
+| ESP32-CAM | MJPEG | Yes (HTTP) | |
+| Generic ONVIF | ONVIF + RTSP | Yes (WS-Discovery) | |
+
+## ONVIF Discovery Results
+
+| Camera IP | Brand | PTZ | Audio (ONVIF) | Audio (RTSP) | Best Stream |
+|-----------|-------|-----|---------------|--------------|-------------|
+| V360/XiongMai | V360 | Digital PTZ | Source exists, not in stream | No | /live/ch00_1 (720p) |
+| 192.168.1.10 | Unknown | Real PTZ motor | No | No | /live/ch00_1 |
+
+### Known Limitations
+- V360/XiongMai cameras do NOT send audio via RTSP despite having audio hardware
+- Audio is only available via XMEye P2P proprietary protocol (V360 Pro app)
+- PTZ on V360 is digital (software crop/pan), not physical motor
+- ONVIF port is 8899, not standard 80
 
 ## License
 

@@ -41,6 +41,23 @@
         </div>
       </div>
 
+      <!-- ONVIF Capabilities -->
+      <div class="bg-green-50 dark:bg-green-900/20 rounded-lg p-6 border border-green-200 dark:border-green-800 mt-6">
+        <h2 class="text-lg font-bold mb-3 text-green-700 dark:text-green-400">ONVIF Capabilities (V360/XiongMai)</h2>
+        <div class="text-sm text-green-600 dark:text-green-300 space-y-2">
+          <p><strong>ONVIF Port:</strong> 8899 (auto-detected)</p>
+          <p><strong>PTZ:</strong> Digital PTZ supported via ONVIF ContinuousMove. Use arrow keys or PTZ panel in Live View.</p>
+          <p><strong>Audio via RTSP:</strong> Not available on these cameras. Audio hardware exists (AudioSource detected via ONVIF) but firmware does not expose audio through RTSP stream.</p>
+          <p><strong>Audio via V360 Pro App:</strong> Available only through XMEye P2P proprietary protocol (used by V360 Pro / XMEye mobile apps).</p>
+          <p><strong>Stream Profiles:</strong></p>
+          <ul class="list-disc list-inside ml-4">
+            <li><code>stream0_0</code> — 1280x720 (HD) main stream</li>
+            <li><code>stream0_1</code> — 640x360 (SD) sub stream</li>
+          </ul>
+          <p><strong>Best RTSP URL:</strong> <code>rtsp://IP:554/live/ch00_1</code> (720p HD)</p>
+        </div>
+      </div>
+
       <!-- Hikvision -->
       <div class="bg-white dark:bg-nvr-card rounded-lg p-6 border border-gray-200 dark:border-nvr-border">
         <h2 class="text-lg font-bold mb-3 text-primary-600 dark:text-primary-400">Hikvision</h2>
