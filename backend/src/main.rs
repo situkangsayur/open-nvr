@@ -76,6 +76,19 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
+    // HLS watchdog: restart dead/hung ffmpeg processes every 30s
+    if let Some(ref hls_mgr) = state.hls_manager {
+        let watchdog_mgr = hls_mgr.clone();
+        tokio::spawn(async move {
+            // Wait for initial streams to start
+            tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+            loop {
+                watchdog_mgr.check_and_restart().await;
+                tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+            }
+        });
+    }
+
     // Health monitor
     let health_camera_repo = Arc::new(
         open_nvr_infrastructure::persistence::PgCameraRepository::new(pool),

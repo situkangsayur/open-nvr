@@ -2,6 +2,7 @@ services:
   postgres:
     image: postgres:16
     container_name: opennvr-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: opennvr
       POSTGRES_PASSWORD: opennvr_secret
@@ -9,7 +10,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U opennvr -d opennvr"]
@@ -23,8 +24,11 @@ services:
   redis:
     image: redis:7
     container_name: opennvr-redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
+    volumes:
+      - ./data/redis:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -37,6 +41,7 @@ services:
   minio:
     image: minio/minio:latest
     container_name: opennvr-minio
+    restart: unless-stopped
     environment:
       MINIO_ROOT_USER: opennvr
       MINIO_ROOT_PASSWORD: opennvr_secret
@@ -44,7 +49,7 @@ services:
       - "9000:9000"
       - "9001:9001"
     volumes:
-      - minio-data:/data
+      - ./data/minio:/data
     command: server /data --console-address ":9001"
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
@@ -73,6 +78,7 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
     container_name: opennvr-keycloak
+    restart: unless-stopped
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
@@ -101,6 +107,7 @@ services:
   nats:
     image: nats:2
     container_name: opennvr-nats
+    restart: unless-stopped
     ports:
       - "4222:4222"
       - "8222:8222"
@@ -129,7 +136,7 @@ services:
       - "9200:9200"
       - "9600:9600"
     volumes:
-      - opensearch-data:/usr/share/opensearch/data
+      - ./data/opensearch:/usr/share/opensearch/data
     networks:
       - opennvr-network
     healthcheck:
@@ -152,11 +159,6 @@ services:
         condition: service_healthy
     networks:
       - opennvr-network
-
-volumes:
-  postgres-data:
-  minio-data:
-  opensearch-data:
 
 networks:
   opennvr-network:
