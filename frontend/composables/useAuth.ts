@@ -15,6 +15,9 @@ let refreshTimer: ReturnType<typeof setTimeout> | null = null
 
 export const useAuth = () => {
   const config = useRuntimeConfig()
+  // Keycloak's host follows the server the user picked at login; realm and
+  // client id stay build-time config since they do not change per network.
+  const { keycloakUrl } = useServerConfig()
   const token = computed(() => authState.token)
   const user = computed(() => authState.user)
   const isAuthenticated = computed(() => !!authState.token)
@@ -53,7 +56,7 @@ export const useAuth = () => {
 
   /** Direct login with username/password (Keycloak ROPC grant) */
   const loginDirect = async (username: string, password: string): Promise<void> => {
-    const tokenUrl = `${config.public.keycloakUrl}/realms/${config.public.keycloakRealm}/protocol/openid-connect/token`
+    const tokenUrl = `${keycloakUrl.value}/realms/${config.public.keycloakRealm}/protocol/openid-connect/token`
 
     const body = new URLSearchParams({
       grant_type: 'password',
@@ -85,7 +88,7 @@ export const useAuth = () => {
       response_type: 'code',
       scope: 'openid profile email',
     })
-    window.location.href = `${config.public.keycloakUrl}/realms/${config.public.keycloakRealm}/protocol/openid-connect/auth?${params}`
+    window.location.href = `${keycloakUrl.value}/realms/${config.public.keycloakRealm}/protocol/openid-connect/auth?${params}`
   }
 
   /** Handle OIDC callback — exchange code for tokens */
@@ -100,7 +103,7 @@ export const useAuth = () => {
     }
 
     try {
-      const tokenUrl = `${config.public.keycloakUrl}/realms/${config.public.keycloakRealm}/protocol/openid-connect/token`
+      const tokenUrl = `${keycloakUrl.value}/realms/${config.public.keycloakRealm}/protocol/openid-connect/token`
       const body = new URLSearchParams({
         grant_type: 'authorization_code',
         client_id: config.public.keycloakClientId,
@@ -145,7 +148,7 @@ export const useAuth = () => {
 
   const refreshAccessToken = async (refreshToken: string): Promise<boolean> => {
     try {
-      const tokenUrl = `${config.public.keycloakUrl}/realms/${config.public.keycloakRealm}/protocol/openid-connect/token`
+      const tokenUrl = `${keycloakUrl.value}/realms/${config.public.keycloakRealm}/protocol/openid-connect/token`
       const body = new URLSearchParams({
         grant_type: 'refresh_token',
         client_id: config.public.keycloakClientId,
@@ -192,7 +195,7 @@ export const useAuth = () => {
 
     if (import.meta.client) {
       // Keycloak logout
-      const logoutUrl = `${config.public.keycloakUrl}/realms/${config.public.keycloakRealm}/protocol/openid-connect/logout`
+      const logoutUrl = `${keycloakUrl.value}/realms/${config.public.keycloakRealm}/protocol/openid-connect/logout`
       const params = new URLSearchParams({
         client_id: config.public.keycloakClientId,
         post_logout_redirect_uri: `${window.location.origin}/login`,

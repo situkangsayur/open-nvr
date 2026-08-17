@@ -15,7 +15,7 @@ const props = defineProps<{ cameraId: string }>()
 const videoEl = ref<HTMLVideoElement | null>(null)
 const connected = ref(false)
 const statusMessage = ref('Connecting...')
-const config = useRuntimeConfig()
+const { apiUrl } = useServerConfig()
 
 let ws: WebSocket | null = null
 let mediaSource: MediaSource | null = null
@@ -45,7 +45,7 @@ function cleanup() {
 
 function connectStream() {
   statusMessage.value = 'Connecting...'
-  const wsUrl = config.public.apiUrl.replace(/^http/, 'ws')
+  const wsUrl = apiUrl.value.replace(/^http/, 'ws')
 
   try {
     ws = new WebSocket(`${wsUrl}/ws/stream/${props.cameraId}`)

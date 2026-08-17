@@ -13,5 +13,8 @@
 
 <script setup lang="ts">
 const config = useRuntimeConfig()
-const keycloakUrl = `${config.public.keycloakUrl}/admin/${config.public.keycloakRealm}/console`
+const server = useServerConfig()
+const keycloakUrl = computed(
+  () => `${server.keycloakUrl.value}/admin/${config.public.keycloakRealm}/console`,
+)
 </script>

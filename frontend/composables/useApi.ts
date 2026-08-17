@@ -1,5 +1,5 @@
 export const useApi = async <T>(path: string, options?: any): Promise<T> => {
-  const config = useRuntimeConfig()
+  const { apiUrl } = useServerConfig()
   const { token } = useAuth()
 
   const headers: Record<string, string> = {}
@@ -8,7 +8,7 @@ export const useApi = async <T>(path: string, options?: any): Promise<T> => {
   }
 
   try {
-    const response = await $fetch<T>(`${config.public.apiUrl}${path}`, {
+    const response = await $fetch<T>(`${apiUrl.value}${path}`, {
       ...options,
       headers: {
         ...headers,

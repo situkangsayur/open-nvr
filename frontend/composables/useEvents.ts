@@ -11,13 +11,13 @@ const events = ref<NvrEvent[]>([])
 let ws: WebSocket | null = null
 
 export const useEvents = () => {
-  const config = useRuntimeConfig()
+  const { apiUrl } = useServerConfig()
   const connected = ref(false)
 
   const connect = () => {
     if (!import.meta.client || ws) return
 
-    const wsUrl = config.public.apiUrl.replace(/^http/, 'ws')
+    const wsUrl = apiUrl.value.replace(/^http/, 'ws')
     ws = new WebSocket(`${wsUrl}/ws/events`)
 
     ws.onopen = () => {

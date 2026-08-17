@@ -54,11 +54,14 @@
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
         <div>
           <span class="text-gray-500 dark:text-gray-400">Keycloak</span>
-          <p class="text-primary-600 dark:text-primary-400 text-xs break-all">{{ config.public.keycloakUrl }}</p>
+          <p class="text-primary-600 dark:text-primary-400 text-xs break-all">{{ keycloakUrl }}</p>
         </div>
         <div>
           <span class="text-gray-500 dark:text-gray-400">API</span>
-          <p class="text-primary-600 dark:text-primary-400 text-xs break-all">{{ config.public.apiUrl }}</p>
+          <p class="text-primary-600 dark:text-primary-400 text-xs break-all">
+            {{ apiUrl }}
+            <span v-if="isCustom" class="ml-1 text-amber-500" title="Overridden on this device at login">(custom)</span>
+          </p>
         </div>
         <div>
           <span class="text-gray-500 dark:text-gray-400">Cameras</span>
@@ -76,7 +79,7 @@
 </template>
 
 <script setup lang="ts">
-const config = useRuntimeConfig()
+const { apiUrl, keycloakUrl, isCustom } = useServerConfig()
 const stats = ref({ totalCameras: 0, onlineCameras: 0, offlineCameras: 0, unresolvedAlerts: 0 })
 const auditLogs = ref<any[]>([])
 const networkEvents = ref<any[]>([])

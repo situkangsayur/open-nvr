@@ -47,7 +47,7 @@
 
 <script setup lang="ts">
 const props = defineProps<{ camera: any }>()
-const config = useRuntimeConfig()
+const { apiUrl: apiBase } = useServerConfig()
 const { markStarted, isStarted, cacheSnapshot, getCachedSnapshot } = useHlsCache()
 
 const videoEl = ref<HTMLVideoElement | null>(null)
@@ -100,7 +100,7 @@ async function startStream() {
 }
 
 async function startHls() {
-  const apiUrl = config.public.apiUrl
+  const apiUrl = apiBase.value
   const camId = props.camera.id
 
   try {
@@ -138,7 +138,7 @@ async function startHls() {
 
 async function grabSnapshot() {
   try {
-    const url = `${config.public.apiUrl}/api/cameras/${props.camera.id}/snapshot?t=${Date.now()}`
+    const url = `${apiBase.value}/api/cameras/${props.camera.id}/snapshot?t=${Date.now()}`
     const resp = await fetch(url)
     if (resp.ok && resp.headers.get('content-type')?.includes('image')) {
       const blob = await resp.blob()
