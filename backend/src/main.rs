@@ -89,6 +89,13 @@ async fn main() -> anyhow::Result<()> {
         });
     }
 
+    // Storage rotation: keep recordings inside the configured disk budget
+    // (RECORDINGS_MAX_DISK_PERCENT, default 80%) by deleting oldest segments.
+    let rotation_config = open_nvr_worker::storage_rotation::RotationConfig::from_env();
+    tokio::spawn(open_nvr_worker::storage_rotation::storage_rotation_worker(
+        rotation_config,
+    ));
+
     // Health monitor
     let health_camera_repo = Arc::new(
         open_nvr_infrastructure::persistence::PgCameraRepository::new(pool),

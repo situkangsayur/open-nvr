@@ -15,6 +15,7 @@ pub struct HlsStreamManager {
     cameras: Arc<RwLock<HashMap<Uuid, Camera>>>,
     hls_dir: PathBuf,
     rec_dir: PathBuf,
+    log_dir: PathBuf,
 }
 
 struct HlsStream {
@@ -27,13 +28,46 @@ impl HlsStreamManager {
     pub fn new(hls_dir: &str) -> Self {
         let path = PathBuf::from(hls_dir);
         std::fs::create_dir_all(&path).ok();
-        let rec_path = PathBuf::from("/tmp/opennvr-recordings");
-        std::fs::create_dir_all(&rec_path).ok();
+
+        // Recordings must outlive a reboot, so they default to a directory
+        // under the working dir rather than /tmp. Override with RECORDINGS_DIR.
+        let rec_path = std::env::var("RECORDINGS_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| PathBuf::from("./recordings"));
+        if let Err(e) = std::fs::create_dir_all(&rec_path) {
+            error!(dir = %rec_path.display(), error = %e, "Failed to create recordings directory");
+        }
+
+        let log_dir = std::env::var("FFMPEG_LOG_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| PathBuf::from("/tmp/opennvr-ffmpeg-logs"));
+        std::fs::create_dir_all(&log_dir).ok();
+
+        info!(
+            hls_dir = %path.display(),
+            recordings_dir = %rec_path.display(),
+            "HLS/recording manager initialised"
+        );
+
         Self {
             streams: Arc::new(RwLock::new(HashMap::new())),
             cameras: Arc::new(RwLock::new(HashMap::new())),
             hls_dir: path,
             rec_dir: rec_path,
+            log_dir,
+        }
+    }
+
+    /// Open a truncating log file for an ffmpeg process, so a stream that
+    /// fails to start leaves a diagnosable reason behind.
+    fn ffmpeg_log(&self, camera_id: Uuid, kind: &str) -> std::process::Stdio {
+        let path = self.log_dir.join(format!("{}-{}.log", camera_id, kind));
+        match std::fs::File::create(&path) {
+            Ok(file) => std::process::Stdio::from(file),
+            Err(e) => {
+                warn!(path = %path.display(), error = %e, "Cannot open ffmpeg log, discarding stderr");
+                std::process::Stdio::null()
+            }
         }
     }
 
@@ -43,14 +77,28 @@ impl HlsStreamManager {
     }
 
     /// Spawn the HLS ffmpeg process for a camera.
-    fn spawn_hls_ffmpeg(stream_url: &str, seg_pattern: &str, playlist_path: &str) -> Result<Child, String> {
+    fn spawn_hls_ffmpeg(
+        stream_url: &str,
+        seg_pattern: &str,
+        playlist_path: &str,
+        log: std::process::Stdio,
+    ) -> Result<Child, String> {
         Command::new("ffmpeg")
             .args([
                 "-nostdin",
                 "-rtsp_transport", "tcp",
                 "-timeout", "5000000",    // RTSP timeout 5s (microseconds)
+                // Some cameras send SPS/PPS late; without a generous probe
+                // window ffmpeg gives up with "unspecified size" and writes
+                // no output at all.
+                "-analyzeduration", "10000000",
+                "-probesize", "10000000",
                 "-i", stream_url,
                 "-c:v", "copy",
+                // Audio is optional: cameras without an audio track must still
+                // produce video, so map it with the "?" (optional) modifier.
+                "-map", "0:v:0",
+                "-map", "0:a:0?",
                 "-c:a", "aac",
                 "-ac", "1",
                 "-ar", "44100",
@@ -62,20 +110,28 @@ impl HlsStreamManager {
                 playlist_path,
             ])
             .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
+            .stderr(log)
+            .stdin(std::process::Stdio::null())
             .kill_on_drop(true)
             .spawn()
             .map_err(|e| format!("Failed to start ffmpeg HLS: {}", e))
     }
 
     /// Spawn the recording ffmpeg process for a camera.
-    fn spawn_rec_ffmpeg(stream_url: &str, rec_pattern: &str) -> Option<Child> {
+    fn spawn_rec_ffmpeg(
+        stream_url: &str,
+        rec_pattern: &str,
+        log: std::process::Stdio,
+    ) -> Option<Child> {
         match Command::new("ffmpeg")
             .args([
                 "-nostdin",
                 "-rtsp_transport", "tcp",
                 "-timeout", "5000000",
+                "-analyzeduration", "10000000",
+                "-probesize", "10000000",
                 "-i", stream_url,
+                "-map", "0:v:0",
                 "-c:v", "copy",
                 "-an",
                 "-f", "segment",
@@ -86,7 +142,7 @@ impl HlsStreamManager {
                 rec_pattern,
             ])
             .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
+            .stderr(log)
             .stdin(std::process::Stdio::null())
             .kill_on_drop(true)
             .spawn()
@@ -120,6 +176,33 @@ impl HlsStreamManager {
         self.start_streams(camera).await
     }
 
+    /// Spawn the MP4 recording process for a camera into today's directory.
+    /// Returns `None` if recording could not be started; live HLS is unaffected.
+    fn start_recording(&self, camera: &Camera) -> Option<Child> {
+        let camera_id = camera.id;
+        let rec_camera_dir = self
+            .rec_dir
+            .join(camera_id.to_string())
+            .join(chrono::Utc::now().format("%Y-%m-%d").to_string());
+
+        if let Err(e) = std::fs::create_dir_all(&rec_camera_dir) {
+            error!(camera_id = %camera_id, dir = %rec_camera_dir.display(), error = %e, "Failed to create recording directory");
+            return None;
+        }
+
+        let rec_pattern = rec_camera_dir.join("%Y%m%d_%H%M%S.mp4");
+        let child = Self::spawn_rec_ffmpeg(
+            &camera.stream_url,
+            rec_pattern.to_str()?,
+            self.ffmpeg_log(camera_id, "rec"),
+        );
+
+        if child.is_some() {
+            info!(camera_id = %camera_id, name = %camera.name, dir = %rec_camera_dir.display(), "Recording started");
+        }
+        child
+    }
+
     /// Internal: start ffmpeg processes for a camera (used by start and watchdog).
     async fn start_streams(&self, camera: &Camera) -> Result<(), String> {
         let camera_id = camera.id;
@@ -135,24 +218,13 @@ impl HlsStreamManager {
             &camera.stream_url,
             seg_pattern.to_str().unwrap(),
             playlist_path.to_str().unwrap(),
+            self.ffmpeg_log(camera_id, "hls"),
         )?;
 
         info!(camera_id = %camera_id, name = %camera.name, "HLS stream started");
 
-        // Start recording
-        let rec_camera_dir = self.rec_dir.join(camera_id.to_string())
-            .join(chrono::Utc::now().format("%Y-%m-%d").to_string());
-        std::fs::create_dir_all(&rec_camera_dir).map_err(|e| e.to_string())?;
-
-        let rec_pattern = rec_camera_dir.join("%Y%m%d_%H%M%S.mp4");
-        let rec_child = Self::spawn_rec_ffmpeg(
-            &camera.stream_url,
-            rec_pattern.to_str().unwrap(),
-        );
-
-        if rec_child.is_some() {
-            info!(camera_id = %camera_id, name = %camera.name, dir = %rec_camera_dir.display(), "Recording started");
-        }
+        // Start recording. A recording failure is non-fatal: live HLS keeps running.
+        let rec_child = self.start_recording(camera);
 
         let mut streams = self.streams.write().await;
         streams.insert(
@@ -225,6 +297,8 @@ impl HlsStreamManager {
     /// Should be called periodically (e.g. every 30 seconds).
     pub async fn check_and_restart(&self) {
         let mut dead_cameras: Vec<Camera> = Vec::new();
+        // Cameras whose HLS is healthy but whose recording process died.
+        let mut rec_restart: Vec<Uuid> = Vec::new();
 
         // Check for dead/hung processes
         {
@@ -270,6 +344,19 @@ impl HlsStreamManager {
                     }
 
                     to_remove.push(*camera_id);
+                    continue;
+                }
+
+                // HLS is fine, but the recording process may have died on its
+                // own (camera hiccup, disk error). Reap it and flag a restart
+                // so recording does not stop silently.
+                let rec_dead = match stream.rec_process {
+                    Some(ref mut rec) => !matches!(rec.try_wait(), Ok(None)),
+                    None => true,
+                };
+                if rec_dead {
+                    stream.rec_process = None;
+                    rec_restart.push(*camera_id);
                 }
             }
 
@@ -295,8 +382,28 @@ impl HlsStreamManager {
             }
         }
 
-        if !dead_cameras.is_empty() {
-            info!(restarted = dead_cameras.len(), "Watchdog restart complete");
+        // Restart recordings that died while their HLS stream stayed healthy.
+        let mut rec_restarted = 0;
+        for camera_id in rec_restart {
+            let camera = self.cameras.read().await.get(&camera_id).cloned();
+            let Some(camera) = camera else { continue };
+
+            warn!(camera_id = %camera_id, name = %camera.name, "Recording process died, restarting");
+            if let Some(child) = self.start_recording(&camera) {
+                let mut streams = self.streams.write().await;
+                if let Some(stream) = streams.get_mut(&camera_id) {
+                    stream.rec_process = Some(child);
+                    rec_restarted += 1;
+                }
+            }
+        }
+
+        if !dead_cameras.is_empty() || rec_restarted > 0 {
+            info!(
+                streams_restarted = dead_cameras.len(),
+                recordings_restarted = rec_restarted,
+                "Watchdog restart complete"
+            );
         }
     }
 }

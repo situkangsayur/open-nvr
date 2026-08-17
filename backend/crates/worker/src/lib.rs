@@ -4,3 +4,4 @@ pub mod hls;
 pub mod manager;
 pub mod recording;
 pub mod retention;
+pub mod storage_rotation;
