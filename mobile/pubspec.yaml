@@ -1,0 +1,30 @@
+name: open_nvr_mobile
+description: Open-NVR mobile client — live CCTV viewing for the self-hosted NVR.
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # REST calls to the Open-NVR API and Keycloak token endpoint.
+  http: ^1.2.2
+  # Server address / port — not secret, plain preferences are fine.
+  shared_preferences: ^2.3.3
+  # Access + refresh tokens go in the Android Keystore, not preferences.
+  flutter_secure_storage: ^9.2.2
+  # HLS playback. On Android this is ExoPlayer, which handles m3u8 natively
+  # and is far kinder to the battery than decoding a WebSocket stream in Dart.
+  video_player: ^2.9.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true

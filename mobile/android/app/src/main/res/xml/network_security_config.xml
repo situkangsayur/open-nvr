@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 9+ blocks cleartext HTTP by default. Open-NVR is reached over plain
+  HTTP on private addresses (the camera LAN, or the WireGuard tunnel), and the
+  server address is chosen by the user at login — so it cannot be pinned to a
+  fixed allow-list here without breaking the feature.
+
+  This is acceptable only because every path to the server is already a private
+  network: the LAN, or an encrypted WireGuard tunnel. If the NVR is ever exposed
+  to the public internet, put TLS in front of it and set
+  cleartextTrafficPermitted="false".
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <!-- Lets a self-signed cert installed by the user be trusted, for
+                 when the NVR is put behind HTTPS with a private CA. -->
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
