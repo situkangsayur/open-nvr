@@ -1,4 +1,5 @@
 use axum::middleware as axum_middleware;
+use open_nvr_api::middleware::auth::KeycloakConfig;
 use open_nvr_api::middleware::security_headers::security_headers_middleware;
 use open_nvr_api::routes::create_router;
 use open_nvr_api::state::AppState;
@@ -124,7 +125,20 @@ async fn main() -> anyhow::Result<()> {
         .allow_credentials(true)
         .max_age(std::time::Duration::from_secs(3600));
 
+    // Keycloak public key for /api token validation. Fetching it here is only a
+    // warm-up: the middleware fetches on demand if Keycloak was not up yet, so
+    // a cold Keycloak must not stop the NVR from booting and recording.
+    let keycloak_config = KeycloakConfig::new(
+        &std::env::var("KEYCLOAK_URL").unwrap_or_else(|_| "http://localhost:8080".into()),
+        &std::env::var("KEYCLOAK_REALM").unwrap_or_else(|_| "opennvr".into()),
+    );
+    match keycloak_config.fetch_public_key().await {
+        Ok(()) => info!("Keycloak signing key loaded"),
+        Err(e) => tracing::warn!(error = %e, "Keycloak key not loaded yet; will retry per request"),
+    }
+
     let app = create_router(state)
+        .layer(axum::Extension(keycloak_config))
         .layer(axum_middleware::from_fn(security_headers_middleware))
         .layer(TraceLayer::new_for_http())
         .layer(cors);

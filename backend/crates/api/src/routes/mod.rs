@@ -21,6 +21,7 @@ mod user;
 
 use axum::routing::get;
 use axum::Router;
+use crate::middleware::auth::auth_middleware;
 use crate::state::AppState;
 
 pub fn create_router(state: AppState) -> Router {
@@ -32,7 +33,12 @@ pub fn create_router(state: AppState) -> Router {
     Router::new()
         .merge(health::routes())
         .merge(ws_routes)
-        .nest("/api", api_routes(state))
+        // Everything under /api needs a valid Keycloak token. `/health` stays
+        // open so uptime checks keep working without a credential.
+        .nest(
+            "/api",
+            api_routes(state).layer(axum::middleware::from_fn(auth_middleware)),
+        )
 }
 
 fn api_routes(state: AppState) -> Router {

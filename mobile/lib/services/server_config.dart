@@ -87,11 +87,16 @@ class ServerConfigService extends ChangeNotifier {
   static const _profilesKey = 'nvr_server_profiles';
   static const _selectedKey = 'nvr_selected_profile';
 
-  /// Seeded on first run: the LAN address at home, and the WireGuard bridge
-  /// on nvr-devbox for when the phone is away and the tunnel is up.
+  /// Seeded on first run so the login screen is not blank. Real addresses stay
+  /// out of the repository: pass them at build time with
+  /// `--dart-define=NVR_LAN_HOST=… --dart-define=NVR_VPN_HOST=…`, or just type
+  /// the address on the login screen — it is remembered from then on.
+  static const _lanHost = String.fromEnvironment('NVR_LAN_HOST', defaultValue: '192.168.1.10');
+  static const _vpnHost = String.fromEnvironment('NVR_VPN_HOST', defaultValue: '10.0.0.10');
+
   static const defaultProfiles = <ServerProfile>[
-    ServerProfile(name: 'Rumah (LAN)', host: '192.168.1.11'),
-    ServerProfile(name: 'Remote (WireGuard)', host: '10.0.0.10'),
+    ServerProfile(name: 'Rumah (LAN)', host: _lanHost),
+    ServerProfile(name: 'Remote (WireGuard)', host: _vpnHost),
   ];
 
   List<ServerProfile> _profiles = List.of(defaultProfiles);

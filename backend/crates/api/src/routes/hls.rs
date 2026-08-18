@@ -1,4 +1,4 @@
-use axum::extract::{Path, State};
+use axum::extract::{Path, RawQuery, State};
 use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
@@ -14,10 +14,36 @@ pub fn routes(state: AppState) -> Router {
         .with_state(state)
 }
 
+fn access_token(query: Option<&str>) -> Option<&str> {
+    query?
+        .split('&')
+        .filter_map(|pair| pair.split_once('='))
+        .find(|(key, _)| *key == "access_token")
+        .map(|(_, value)| value)
+}
+
+/// Append `?access_token=` to every segment URI in an m3u8 playlist. Lines that
+/// start with `#` are tags, and blank lines are padding — both are left alone.
+fn with_token_on_segments(playlist: &[u8], token: &str) -> String {
+    String::from_utf8_lossy(playlist)
+        .lines()
+        .map(|line| {
+            let uri = line.trim();
+            if uri.is_empty() || uri.starts_with('#') {
+                line.to_string()
+            } else {
+                format!("{}?access_token={}", line, token)
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 /// Serve HLS playlist or segment files
 async fn serve_hls(
     State(state): State<AppState>,
     Path((camera_id, filename)): Path<(Uuid, String)>,
+    RawQuery(query): RawQuery,
 ) -> Response {
     // Validate filename (security: prevent path traversal)
     if filename.contains("..") || filename.contains('/') {
@@ -39,6 +65,14 @@ async fn serve_hls(
                 "video/mp2t"
             } else {
                 "application/octet-stream"
+            };
+
+            // A player asked for the playlist with `?access_token=` because it
+            // cannot send headers. Segment URIs inside the playlist are relative
+            // and would lose that token, so carry it over to each of them.
+            let data = match (filename.ends_with(".m3u8"), access_token(query.as_deref())) {
+                (true, Some(token)) => with_token_on_segments(&data, token).into_bytes(),
+                _ => data,
             };
 
             (

@@ -38,7 +38,7 @@
             <div class="flex gap-2">
               <div class="flex-1 min-w-0">
                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Host / IP</label>
-                <input v-model="serverHost" type="text" placeholder="192.168.1.11"
+                <input v-model="serverHost" type="text" placeholder="192.168.1.10"
                   class="w-full bg-gray-50 dark:bg-nvr-darker border border-gray-300 dark:border-nvr-border rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-primary-500 outline-none" />
               </div>
               <div class="w-24 shrink-0">

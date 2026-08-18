@@ -7,9 +7,9 @@ import 'package:open_nvr_mobile/theme.dart';
 void main() {
   group('ServerProfile', () {
     test('builds API and Keycloak base URLs from host and ports', () {
-      const profile = ServerProfile(name: 'Rumah', host: '192.168.1.11');
-      expect(profile.apiBase, 'http://192.168.1.11:8888');
-      expect(profile.keycloakBase, 'http://192.168.1.11:8080');
+      const profile = ServerProfile(name: 'Rumah', host: '192.168.1.10');
+      expect(profile.apiBase, 'http://192.168.1.10:8888');
+      expect(profile.keycloakBase, 'http://192.168.1.10:8080');
     });
 
     test('honours the HTTPS flag on both endpoints', () {
@@ -35,9 +35,12 @@ void main() {
     });
 
     test('ships a home and a remote profile out of the box', () {
-      final hosts = ServerConfigService.defaultProfiles.map((p) => p.host).toList();
-      expect(hosts, contains('192.168.1.11'));
-      expect(hosts, contains('10.0.0.10'));
+      final profiles = ServerConfigService.defaultProfiles;
+      expect(profiles, hasLength(2));
+      expect(profiles.map((p) => p.name), containsAll(['Rumah (LAN)', 'Remote (WireGuard)']));
+      // The addresses themselves come from --dart-define, so assert only that
+      // each profile ends up with a usable host.
+      expect(profiles.every((p) => p.host.isNotEmpty), isTrue);
     });
   });
 

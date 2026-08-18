@@ -12,7 +12,11 @@ use tracing::warn;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
+    /// This realm's tokens are issued without `sub`, so it is filled in from
+    /// `preferred_username` after decoding — see `auth_middleware`.
+    #[serde(default)]
     pub sub: String,
+    pub iss: String,
     pub email: Option<String>,
     pub preferred_username: Option<String>,
     pub realm_access: Option<RealmAccess>,
@@ -41,6 +45,8 @@ impl Claims {
 #[derive(Clone)]
 pub struct KeycloakConfig {
     pub realm_url: String,
+    /// `/realms/<realm>` — the tail every issuer for this realm ends with.
+    pub realm_path: String,
     pub decoding_key: Arc<RwLock<Option<DecodingKey>>>,
 }
 
@@ -48,6 +54,7 @@ impl KeycloakConfig {
     pub fn new(keycloak_url: &str, realm: &str) -> Self {
         Self {
             realm_url: format!("{}/realms/{}", keycloak_url, realm),
+            realm_path: format!("/realms/{}", realm),
             decoding_key: Arc::new(RwLock::new(None)),
         }
     }
@@ -84,6 +91,16 @@ impl KeycloakConfig {
     }
 }
 
+/// Pull `access_token` out of a raw query string. JWTs are base64url, so the
+/// value needs no percent-decoding.
+fn token_from_query(query: Option<&str>) -> Option<String> {
+    query?
+        .split('&')
+        .filter_map(|pair| pair.split_once('='))
+        .find(|(key, _)| *key == "access_token")
+        .map(|(_, value)| value.to_string())
+}
+
 /// Axum middleware that validates JWT tokens from Keycloak
 pub async fn auth_middleware(
     request: Request,
@@ -107,14 +124,18 @@ pub async fn auth_middleware(
         }
     };
 
-    // Extract Authorization header
-    let auth_header = request
+    // Authorization header first, then `?access_token=`. The query form exists
+    // because `<video src>` and `<img src>` cannot carry headers, and HLS
+    // playlists, segments and snapshots all live under the protected /api tree.
+    let token = request
         .headers()
         .get("authorization")
         .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "));
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .map(str::to_owned)
+        .or_else(|| token_from_query(request.uri().query()));
 
-    let token = match auth_header {
+    let token = match token {
         Some(t) => t,
         None => {
             return (
@@ -156,12 +177,32 @@ pub async fn auth_middleware(
 
     let mut validation = Validation::new(Algorithm::RS256);
     validation.validate_exp = true;
-    validation.set_issuer(&[&keycloak_config.realm_url]);
+    validation.validate_aud = false;
 
-    match decode::<Claims>(token, &decoding_key, &validation) {
+    match decode::<Claims>(&token, &decoding_key, &validation) {
         Ok(token_data) => {
+            // The same Keycloak answers on the LAN address and on the WireGuard
+            // address, so `iss` differs by host between clients. Pin the realm
+            // path instead — the RSA signature is what ties the token to us.
+            if !token_data.claims.iss.ends_with(&keycloak_config.realm_path) {
+                warn!(iss = %token_data.claims.iss, "Token issued by an unexpected realm");
+                return (
+                    StatusCode::UNAUTHORIZED,
+                    Json(json!({"error": "Invalid or expired token"})),
+                )
+                    .into_response();
+            }
+            let mut claims = token_data.claims;
+            if claims.sub.is_empty() {
+                // Audit rows still need a name for whoever did the thing.
+                claims.sub = claims
+                    .preferred_username
+                    .clone()
+                    .unwrap_or_else(|| "unknown".to_string());
+            }
+
             let mut request = request;
-            request.extensions_mut().insert(token_data.claims);
+            request.extensions_mut().insert(claims);
             next.run(request).await
         }
         Err(e) => {

@@ -222,7 +222,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 14),
                   TextFormField(
                     controller: _host,
-                    decoration: const InputDecoration(labelText: 'Host / IP', hintText: '192.168.1.11'),
+                    decoration: const InputDecoration(labelText: 'Host / IP', hintText: '192.168.1.10'),
                     autocorrect: false,
                     keyboardType: TextInputType.url,
                     onChanged: (_) => setState(() {}),

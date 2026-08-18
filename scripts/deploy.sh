@@ -5,7 +5,7 @@
 # =============================================================================
 set -e
 
-SERVER="${1:-10.0.0.10}"
+SERVER="${1:-${NVR_DEPLOY_HOST:?set NVR_DEPLOY_HOST or pass the host as $1}}"
 SSH_PORT="${2:-1313}"
 SSH_USER="${3:-open-nvr}"
 APP_DIR="/home/open-nvr/apps/open-nvr"

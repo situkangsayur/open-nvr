@@ -118,7 +118,7 @@ See `scripts/deploy.sh` for full deployment automation.
 | Camera IP | Brand | PTZ | Audio (ONVIF) | Audio (RTSP) | Best Stream |
 |-----------|-------|-----|---------------|--------------|-------------|
 | V360/XiongMai | V360 | Digital PTZ | Source exists, not in stream | No | /live/ch00_1 (720p) |
-| 192.168.1.10 | Unknown | Real PTZ motor | No | No | /live/ch00_1 |
+| (LAN camera) | Unknown | Real PTZ motor | No | No | /live/ch00_1 |
 
 ### Known Limitations
 - V360/XiongMai cameras do NOT send audio via RTSP despite having audio hardware

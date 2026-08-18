@@ -27,7 +27,7 @@ const normalise = (url: string): string => url.trim().replace(/\/+$/, '')
 
 /**
  * Build a base URL from loosely typed user input. Accepts bare hosts
- * ("192.168.1.11"), hosts with a scheme, and hosts that already carry a port.
+ * ("192.168.1.10"), hosts with a scheme, and hosts that already carry a port.
  * An explicit `port` wins over one embedded in `host`.
  */
 export const buildBaseUrl = (host: string, port?: string | number): string => {

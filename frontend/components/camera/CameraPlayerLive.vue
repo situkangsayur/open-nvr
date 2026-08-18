@@ -48,7 +48,13 @@
 <script setup lang="ts">
 const props = defineProps<{ camera: any }>()
 const { apiUrl: apiBase } = useServerConfig()
+const { token } = useAuth()
 const { markStarted, isStarted, cacheSnapshot, getCachedSnapshot } = useHlsCache()
+
+/** Header for fetches, and query form for `<video src>`, which cannot set one. */
+const authHeaders = () => (token.value ? { Authorization: `Bearer ${token.value}` } : {})
+const authQuery = (sep: '?' | '&' = '?') =>
+  token.value ? `${sep}access_token=${encodeURIComponent(token.value)}` : ''
 
 const videoEl = ref<HTMLVideoElement | null>(null)
 const currentSnapshot = ref('')
@@ -106,12 +112,14 @@ async function startHls() {
   try {
     // Only request start if not already started globally
     if (!isStarted(camId)) {
-      await fetch(`${apiUrl}/api/hls/${camId}/start`, { method: 'POST' })
+      await fetch(`${apiUrl}/api/hls/${camId}/start`, { method: 'POST', headers: authHeaders() })
       markStarted(camId)
     }
 
-    // Poll until playlist is available (max 8 seconds)
-    const playlistUrl = `${apiUrl}/api/hls/${camId}/stream.m3u8`
+    // Poll until playlist is available (max 8 seconds). The token rides in the
+    // query string so the <video> element can fetch playlist and segments too;
+    // the backend copies it onto each segment URI inside the playlist.
+    const playlistUrl = `${apiUrl}/api/hls/${camId}/stream.m3u8${authQuery()}`
     for (let i = 0; i < 8; i++) {
       await new Promise(r => setTimeout(r, 1000))
       try {
@@ -139,7 +147,7 @@ async function startHls() {
 async function grabSnapshot() {
   try {
     const url = `${apiBase.value}/api/cameras/${props.camera.id}/snapshot?t=${Date.now()}`
-    const resp = await fetch(url)
+    const resp = await fetch(url, { headers: authHeaders() })
     if (resp.ok && resp.headers.get('content-type')?.includes('image')) {
       const blob = await resp.blob()
       const objUrl = URL.createObjectURL(blob)
