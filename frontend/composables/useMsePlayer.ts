@@ -28,11 +28,11 @@ const CODECS = [
 ]
 
 /** Jump to the live edge when playback lags the newest buffered frame by more than this. */
-const MAX_LAG_SECS = 1.0
+const MAX_LAG_SECS = 0.7
 /** Where to land after a jump, relative to the live edge. */
 const LIVE_EDGE_OFFSET_SECS = 0.3
 /** Buffered media older than this (relative to the live edge) is dropped. */
-const KEEP_BUFFER_SECS = 10
+const KEEP_BUFFER_SECS = 6
 /** Give up on a connection that has not produced data for this long. */
 const CONNECT_TIMEOUT_MS = 15000
 const STALL_TIMEOUT_MS = 10000

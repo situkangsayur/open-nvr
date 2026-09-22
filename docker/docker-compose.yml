@@ -1,19 +1,21 @@
+# No credentials live in this file: every secret comes from .env, which is
+# git-ignored. `docker compose` refuses to start if one is missing.
 services:
   postgres:
     image: postgres:16
     container_name: opennvr-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: opennvr
-      POSTGRES_PASSWORD: opennvr_secret
-      POSTGRES_DB: opennvr
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-opennvr}
     ports:
       - "5432:5432"
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U opennvr -d opennvr"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -43,8 +45,8 @@ services:
     container_name: opennvr-minio
     restart: unless-stopped
     environment:
-      MINIO_ROOT_USER: opennvr
-      MINIO_ROOT_PASSWORD: opennvr_secret
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:?set MINIO_ACCESS_KEY in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?set MINIO_SECRET_KEY in .env}
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -63,13 +65,17 @@ services:
   minio-init:
     image: minio/mc:latest
     container_name: opennvr-minio-init
+    environment:
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?set MINIO_ACCESS_KEY in .env}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?set MINIO_SECRET_KEY in .env}
+      MINIO_BUCKET: ${MINIO_BUCKET:-opennvr-recordings}
     depends_on:
       minio:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-      mc alias set opennvr http://minio:9000 opennvr opennvr_secret &&
-      mc mb --ignore-existing opennvr/opennvr-recordings &&
+      mc alias set opennvr http://minio:9000 $$MINIO_ACCESS_KEY $$MINIO_SECRET_KEY &&
+      mc mb --ignore-existing opennvr/$$MINIO_BUCKET &&
       echo 'Bucket opennvr-recordings created successfully'
       "
     networks:
@@ -82,10 +88,10 @@ services:
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
-      KC_DB_USERNAME: opennvr
-      KC_DB_PASSWORD: opennvr_secret
-      KC_BOOTSTRAP_ADMIN_USERNAME: admin
-      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_DB_USERNAME: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in .env}
       KC_HEALTH_ENABLED: "true"
     ports:
       - "8180:8080"
@@ -129,7 +135,7 @@ services:
     container_name: opennvr-opensearch
     environment:
       - discovery.type=single-node
-      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=OpenNvr@2024!
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_ADMIN_PASSWORD:?set OPENSEARCH_ADMIN_PASSWORD in .env}
       - DISABLE_SECURITY_PLUGIN=true
       - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
     ports:

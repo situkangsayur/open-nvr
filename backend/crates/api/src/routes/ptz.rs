@@ -91,7 +91,7 @@ fn http() -> &'static reqwest::Client {
     static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
     CLIENT.get_or_init(|| {
         reqwest::Client::builder()
-            .timeout(Duration::from_secs(4))
+            .timeout(Duration::from_secs(6))
             .connect_timeout(Duration::from_secs(2))
             .build()
             .unwrap_or_default()
@@ -425,7 +425,19 @@ async fn ptz_command(
     };
 
     let creds = credentials(&camera);
-    match soap(&ep.ptz_url, &body, creds.as_ref()).await {
+    let mut result = send(&ep.ptz_url, &body, creds.as_ref()).await;
+
+    // Plenty of cheap cameras have no home position but do have preset 1,
+    // which their own app calls "home".
+    if result.is_err() && cmd.action == "home" {
+        let preset = format!(
+            r#"<tptz:GotoPreset><tptz:ProfileToken>{}</tptz:ProfileToken><tptz:PresetToken>1</tptz:PresetToken></tptz:GotoPreset>"#,
+            token
+        );
+        result = send(&ep.ptz_url, &preset, creds.as_ref()).await;
+    }
+
+    match result {
         Ok(_) => Json(serde_json::json!({
             "status": "ok",
             "camera_id": camera_id,
@@ -435,12 +447,26 @@ async fn ptz_command(
         .into_response(),
         Err(e) => {
             tracing::warn!(camera_id = %camera_id, action = %cmd.action, error = %e, "PTZ command failed");
-            // The endpoint may have moved (DHCP, reboot); rediscover next time.
-            if e.starts_with("camera unreachable") {
-                cache().write().await.remove(&camera_id);
-            }
-            error_response(StatusCode::BAD_GATEWAY, format!("PTZ failed: {}", e))
+            let message = if e.starts_with("camera returned HTTP 400") {
+                format!("Camera does not support {}", cmd.action)
+            } else {
+                format!("PTZ failed: {}", e)
+            };
+            error_response(StatusCode::BAD_GATEWAY, message)
         }
+    }
+}
+
+/// One PTZ call, retried once: these cameras routinely drop a request while
+/// they are busy moving, and losing a `stop` would leave the camera panning.
+async fn send(url: &str, body: &str, creds: Option<&(String, String)>) -> Result<String, String> {
+    match soap(url, body, creds).await {
+        Ok(v) => Ok(v),
+        Err(e) if e.starts_with("camera unreachable") => {
+            tokio::time::sleep(Duration::from_millis(300)).await;
+            soap(url, body, creds).await
+        }
+        Err(e) => Err(e),
     }
 }
 
@@ -473,7 +499,7 @@ async fn goto_preset(
         xml_escape(&ep.profile_token),
         cmd.preset_id
     );
-    match soap(&ep.ptz_url, &body, credentials(&camera).as_ref()).await {
+    match send(&ep.ptz_url, &body, credentials(&camera).as_ref()).await {
         Ok(_) => Json(serde_json::json!({ "status": "ok", "camera_id": camera_id, "preset_id": cmd.preset_id }))
             .into_response(),
         Err(e) => error_response(StatusCode::BAD_GATEWAY, format!("PTZ failed: {}", e)),

@@ -20,6 +20,11 @@ use tracing::{error, info, warn};
 use uuid::Uuid;
 
 pub const API_ADDR: &str = "127.0.0.1:1984";
+/// Grid-tile stream for cameras that publish only one stream. Small enough
+/// that a phone can decode a dozen of them, and cheap enough to transcode.
+const SUB_WIDTH: u32 = 640;
+const SUB_FPS: u32 = 10;
+const SUB_BITRATE_KBPS: u32 = 400;
 pub const RTSP_ADDR: &str = "127.0.0.1:8554";
 
 pub struct Go2Rtc {
@@ -71,10 +76,12 @@ impl Go2Rtc {
         format!("rtsp://{}/{}", RTSP_ADDR, camera_id)
     }
 
-    /// go2rtc stream name for a camera: the main stream, or its sub stream
-    /// when one is configured and asked for.
+    /// go2rtc stream name for a camera: the main stream, or the low-resolution
+    /// one for grid tiles. Every camera has a `_sub` entry — the camera's own
+    /// second stream where it has one, otherwise a downscale that go2rtc only
+    /// runs while someone is watching it.
     pub fn stream_name(camera: &Camera, sub: bool) -> String {
-        if sub && camera.sub_stream_url.is_some() {
+        if sub {
             format!("{}_sub", camera.id)
         } else {
             camera.id.to_string()
@@ -129,9 +136,25 @@ impl Go2Rtc {
         sorted.sort_by_key(|c| c.id);
         for cam in sorted {
             cfg.push_str(&format!("  \"{}\": {}\n", cam.id, yaml_str(&self.source_url(cam, &cam.stream_url))));
-            if let Some(ref sub) = cam.sub_stream_url {
-                cfg.push_str(&format!("  \"{}_sub\": {}\n", cam.id, yaml_str(&self.source_url(cam, sub))));
-            }
+            // Watching eight cameras at once should cost the viewer one
+            // stream's worth of bandwidth and decoding, not eight. The grid
+            // stream is always made here from the single connection we already
+            // have: several of these cameras serve only one RTSP session, so
+            // asking them for their own second stream returns black. go2rtc
+            // starts this on demand and stops it when the last tile closes.
+            let sub = yaml_str(&format!(
+                "exec:ffmpeg -nostdin -hide_banner -loglevel error \
+                 -fflags nobuffer -flags low_delay -probesize 100000 -analyzeduration 500000 \
+                 -rtsp_transport tcp -i rtsp://{rtsp}/{id} -an \
+                 -c:v libx264 -preset ultrafast -tune zerolatency -g {fps} -r {fps} \
+                 -vf scale={w}:-2 -b:v {kbps}k -f rtsp {{output}}",
+                rtsp = RTSP_ADDR,
+                id = cam.id,
+                fps = SUB_FPS,
+                w = SUB_WIDTH,
+                kbps = SUB_BITRATE_KBPS,
+            ));
+            cfg.push_str(&format!("  \"{}_sub\": {}\n", cam.id, sub));
         }
         cfg
     }

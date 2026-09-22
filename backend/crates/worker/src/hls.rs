@@ -313,6 +313,38 @@ impl HlsStreamManager {
         self.hls_dir.join(camera_id.to_string())
     }
 
+    /// Per-camera view of what the streams are actually doing, so the API can
+    /// report a status the user can trust instead of a TCP probe: `Online`
+    /// when fresh video is arriving, `Connecting` while ffmpeg is up but has
+    /// produced nothing yet, `Offline` when there is no stream at all.
+    pub async fn stream_status(&self, camera_id: &Uuid) -> open_nvr_domain::entities::CameraStatus {
+        use open_nvr_domain::entities::CameraStatus;
+        if !self.streams.read().await.contains_key(camera_id) {
+            return CameraStatus::Offline;
+        }
+        let playlist = self.hls_dir.join(camera_id.to_string()).join("stream.m3u8");
+        if let Ok(modified) = std::fs::metadata(&playlist).and_then(|m| m.modified()) {
+            if modified.elapsed().map(|d| d.as_secs() < 30).unwrap_or(false) {
+                return CameraStatus::Online;
+            }
+        }
+        // ffmpeg is up but no video is coming out. That is "connecting" only
+        // for as long as a healthy camera would take; a camera that is simply
+        // not there must not sit on "connecting" forever.
+        let starting = self
+            .streams
+            .read()
+            .await
+            .get(camera_id)
+            .map(|s| s.started_at.elapsed() < HEALTHY_AFTER)
+            .unwrap_or(false);
+        if starting {
+            CameraStatus::Connecting
+        } else {
+            CameraStatus::Offline
+        }
+    }
+
     /// Get count of active streams.
     pub async fn active_count(&self) -> usize {
         self.streams.read().await.len()

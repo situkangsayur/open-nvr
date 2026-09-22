@@ -63,12 +63,17 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
+    let status_repo: Arc<dyn CameraRepository> = Arc::new(
+        open_nvr_infrastructure::persistence::PgCameraRepository::new(pool.clone()),
+    );
+
     // Stream reconcile loop: keeps go2rtc, live HLS and recording running for
     // every camera in the table. Runs forever rather than once at boot, so a
     // camera that was offline at startup (or after a reboot) is picked up as
     // soon as it answers, and a dead process is replaced.
     {
         let state = state.clone();
+        let status_repo = status_repo.clone();
         tokio::spawn(async move {
             if let Some(ref hls) = state.hls_manager {
                 hls.set_via_go2rtc(state.go2rtc.is_some());
@@ -84,6 +89,18 @@ async fn main() -> anyhow::Result<()> {
                         if let Some(ref hls) = state.hls_manager {
                             hls.check_and_restart().await;
                             hls.reconcile(&cameras, restarted).await;
+
+                            // Status follows the stream, not a TCP probe: a
+                            // camera that answers on port 554 but sends no
+                            // video is not "online" to anyone watching, and a
+                            // camera nobody is recording must not sit on
+                            // "connecting" forever.
+                            for camera in &cameras {
+                                let status = hls.stream_status(&camera.id).await;
+                                if status != camera.status {
+                                    let _ = status_repo.update_status(camera.id, status).await;
+                                }
+                            }
                         }
                     }
                     Err(e) => tracing::warn!(error = %e, "Stream reconcile: cannot load cameras"),
@@ -104,13 +121,17 @@ async fn main() -> anyhow::Result<()> {
         rotation_config,
     ));
 
-    // Health monitor
-    let health_camera_repo = Arc::new(
-        open_nvr_infrastructure::persistence::PgCameraRepository::new(pool),
-    );
-    tokio::spawn(open_nvr_worker::health::camera_health_monitor(
-        health_camera_repo as Arc<dyn CameraRepository>,
-    ));
+    // Health monitor: only a fallback now. The reconcile loop derives status
+    // from the live stream, which is what users actually care about, so the
+    // TCP probe would only fight it. Re-enable with TCP_HEALTH_MONITOR=1.
+    if std::env::var("TCP_HEALTH_MONITOR").map(|v| v == "1").unwrap_or(false) {
+        let health_camera_repo = Arc::new(
+            open_nvr_infrastructure::persistence::PgCameraRepository::new(pool),
+        );
+        tokio::spawn(open_nvr_worker::health::camera_health_monitor(
+            health_camera_repo as Arc<dyn CameraRepository>,
+        ));
+    }
 
     info!("Background workers started");
 

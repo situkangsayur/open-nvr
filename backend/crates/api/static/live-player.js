@@ -131,14 +131,14 @@
     if (b && b.length) {
       const start = b.start(0), end = b.end(b.length - 1);
       const lag = end - video.currentTime;
-      if (video.currentTime < start || lag > 1.5) {
+      if (video.currentTime < start || lag > 0.7) {
         video.currentTime = Math.max(start, end - 0.3);   // jump to live edge
       }
       // Gently catch up small drifts instead of jumping.
-      video.playbackRate = lag > 0.6 ? 1.1 : 1.0;
+      video.playbackRate = lag > 0.4 ? 1.1 : 1.0;
       if (video.paused) video.play().catch(function () {});
-      if (video.currentTime - start > 30 && !sb.updating) {
-        sb.remove(start, video.currentTime - 10);
+      if (video.currentTime - start > 20 && !sb.updating) {
+        sb.remove(start, video.currentTime - 6);
         return; // pump continues on the next updateend
       }
     }
