@@ -35,7 +35,10 @@ class AuthService extends ChangeNotifier {
   Map<String, dynamic>? _claims;
   DateTime? _expiresAt;
 
-  bool get isAuthenticated => _accessToken != null && !_isExpired;
+  /// Signed in, or at least holding a refresh token that can renew the
+  /// session. An access token that lapsed while the phone slept is not a
+  /// reason to throw the user back to the login screen.
+  bool get isAuthenticated => _accessToken != null && (!_isExpired || _refreshToken != null);
   String? get accessToken => _accessToken;
   String? get username => _claims?['preferred_username'] as String?;
 
@@ -139,9 +142,19 @@ class AuthService extends ChangeNotifier {
     return detail.isEmpty ? 'Login gagal (HTTP ${response.statusCode})' : detail;
   }
 
+  Future<bool>? _inFlightRefresh;
+
   /// Exchange a refresh token for a fresh access token.
-  /// Returns false when the session can no longer be renewed.
-  Future<bool> _refresh(String refreshToken) async {
+  /// Returns false when the session could not be renewed.
+  ///
+  /// Concurrent callers (a dozen live tiles, the API client, the keep-alive
+  /// timer) share one request: Keycloak rotates refresh tokens, so sending the
+  /// same one twice could get the second attempt rejected and log us out.
+  Future<bool> _refresh(String refreshToken) {
+    return _inFlightRefresh ??= _doRefresh(refreshToken).whenComplete(() => _inFlightRefresh = null);
+  }
+
+  Future<bool> _doRefresh(String refreshToken) async {
     try {
       final response = await http
           .post(
@@ -165,11 +178,18 @@ class AuthService extends ChangeNotifier {
           return true;
         }
       }
+      // Keycloak answered and said no (refresh token expired or revoked):
+      // the session is really over.
+      if (response.statusCode == 400 || response.statusCode == 401) {
+        await logout();
+      }
+      return false;
     } catch (e) {
+      // Network trouble (tunnel down, Wi-Fi switching). Keep the session and
+      // try again on the next call instead of logging the user out.
       debugPrint('Token refresh failed: $e');
+      return false;
     }
-    await logout();
-    return false;
   }
 
   /// Renew the session if the access token is close to expiry.
@@ -184,6 +204,14 @@ class AuthService extends ChangeNotifier {
     final refresh = _refreshToken;
     if (refresh == null) return false;
     return _refresh(refresh);
+  }
+
+  /// A token good for at least another 30 s, refreshing first if needed.
+  /// Used for URLs handed to WebViews and ExoPlayer, which cannot refresh
+  /// anything themselves.
+  Future<String?> freshToken() async {
+    await ensureFresh();
+    return _accessToken;
   }
 
   void _applyAccessToken(String accessToken, String? refreshToken) {

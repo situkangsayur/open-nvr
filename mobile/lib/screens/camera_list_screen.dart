@@ -2,131 +2,123 @@ import 'package:flutter/material.dart';
 
 import '../models/camera.dart';
 import '../services/api_client.dart';
-import '../services/auth_service.dart';
+import '../services/camera_store.dart';
 import '../services/server_config.dart';
 import '../theme.dart';
+import '../widgets/common.dart';
 import 'camera_live_screen.dart';
+import 'home_shell.dart';
+import 'recordings_screen.dart';
 
-class CameraListScreen extends StatefulWidget {
-  const CameraListScreen({
-    super.key,
-    required this.api,
-    required this.auth,
-    required this.servers,
-  });
+/// All cameras as cards with a still thumbnail, status and quick links to
+/// live view and recordings.
+class CameraListScreen extends StatelessWidget {
+  const CameraListScreen({super.key, required this.services, required this.active});
 
-  final ApiClient api;
-  final AuthService auth;
-  final ServerConfigService servers;
+  final AppServices services;
 
-  @override
-  State<CameraListScreen> createState() => _CameraListScreenState();
-}
+  /// Thumbnails are only fetched while this tab is visible.
+  final bool active;
 
-class _CameraListScreenState extends State<CameraListScreen> {
-  List<Camera> _cameras = const [];
-  bool _loading = true;
-  String? _error;
+  CameraStore get _store => services.store;
 
-  @override
-  void initState() {
-    super.initState();
-    _load();
+  void _openLive(BuildContext context, Camera camera) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => CameraLiveScreen(camera: camera, services: services)),
+    );
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final cameras = await widget.api.listCameras();
-      if (!mounted) return;
-      setState(() {
-        _cameras = cameras;
-        _loading = false;
-      });
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.message;
-        _loading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final online = _cameras.where((c) => c.isOnline).length;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Kamera'),
-        actions: [
-          IconButton(
-            tooltip: 'Muat ulang',
-            onPressed: _loading ? null : _load,
-            icon: const Icon(Icons.refresh),
-          ),
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'logout') widget.auth.logout();
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                enabled: false,
-                child: Text(
-                  '${widget.auth.username ?? 'user'} · ${widget.servers.current.name}',
-                  style: const TextStyle(fontSize: 12, color: NvrColors.textSecondary),
-                ),
-              ),
-              const PopupMenuDivider(),
-              const PopupMenuItem(value: 'logout', child: Text('Keluar')),
-            ],
-          ),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: _load,
-        child: _buildBody(online),
+  void _openRecordings(BuildContext context, Camera camera) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RecordingsScreen(
+          services: services,
+          active: true,
+          initialCamera: camera,
+          standalone: true,
+        ),
       ),
     );
   }
 
-  Widget _buildBody(int online) {
-    if (_loading && _cameras.isEmpty) {
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: _store,
+      builder: (context, _) => Scaffold(
+        appBar: AppBar(
+          title: const Text('Kamera'),
+          actions: [
+            IconButton(
+              tooltip: 'Muat ulang',
+              onPressed: _store.loading ? null : () => _store.refresh(),
+              icon: const Icon(Icons.refresh),
+            ),
+            AccountMenu(auth: services.auth, servers: services.servers),
+          ],
+        ),
+        body: RefreshIndicator(
+          onRefresh: () => _store.refresh(),
+          child: _buildBody(context),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
+    final cameras = _store.cameras;
+    if (_store.loading && cameras.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_error != null && _cameras.isEmpty) {
-      return _ErrorState(message: _error!, onRetry: _load, server: widget.servers.current);
+    if (_store.error != null && cameras.isEmpty) {
+      return _ErrorState(message: _store.error!, onRetry: () => _store.refresh(), server: services.servers.current);
     }
 
-    if (_cameras.isEmpty) {
+    if (cameras.isEmpty) {
       return const Center(
         child: Text('Belum ada kamera terdaftar', style: TextStyle(color: NvrColors.textSecondary)),
       );
     }
 
-    return ListView(
-      padding: const EdgeInsets.all(12),
-      children: [
-        _SummaryBar(total: _cameras.length, online: online, server: widget.servers.current),
-        const SizedBox(height: 12),
-        ..._cameras.map(
-          (camera) => Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: _CameraCard(
-              camera: camera,
-              api: widget.api,
-              onTap: camera.isOnline
-                  ? () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => CameraLiveScreen(camera: camera, api: widget.api),
-                        ),
-                      )
-                  : null,
-            ),
+    Widget card(Camera camera) => _CameraCard(
+          camera: camera,
+          api: services.api,
+          showThumbnail: active,
+          onTap: () => _openLive(context, camera),
+          onRecordings: () => _openRecordings(context, camera),
+        );
+
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+          sliver: SliverToBoxAdapter(
+            child: _SummaryBar(total: cameras.length, online: _store.onlineCount, server: services.servers.current),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.all(12),
+          sliver: SliverLayoutBuilder(
+            builder: (context, constraints) {
+              // One column on phones, two or three on tablets.
+              final width = constraints.crossAxisExtent;
+              final columns = (width / 460).ceil().clamp(1, 4);
+              final cardWidth = (width - 10 * (columns - 1)) / columns;
+              return SliverGrid(
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: columns,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  // 16:9 thumbnail plus the text row underneath.
+                  mainAxisExtent: cardWidth * 9 / 16 + 62,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, i) => card(cameras[i]),
+                  childCount: cameras.length,
+                ),
+              );
+            },
           ),
         ),
       ],
@@ -182,10 +174,18 @@ class _SummaryBar extends StatelessWidget {
 }
 
 class _CameraCard extends StatelessWidget {
-  const _CameraCard({required this.camera, required this.api, this.onTap});
+  const _CameraCard({
+    required this.camera,
+    required this.api,
+    required this.showThumbnail,
+    this.onTap,
+    this.onRecordings,
+  });
   final Camera camera;
   final ApiClient api;
+  final bool showThumbnail;
   final VoidCallback? onTap;
+  final VoidCallback? onRecordings;
 
   @override
   Widget build(BuildContext context) {
@@ -195,14 +195,17 @@ class _CameraCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            AspectRatio(
-              aspectRatio: 16 / 9,
+            // The grid cell is sized for a 16:9 image; the image takes
+            // whatever the text row leaves so nothing can overflow.
+            Expanded(
               child: Stack(
                 fit: StackFit.expand,
                 children: [
                   Container(color: Colors.black),
-                  if (camera.isOnline)
+                  if (camera.isOnline && showThumbnail)
                     _Thumbnail(camera: camera, api: api)
+                  else if (camera.isOnline)
+                    const SizedBox.shrink()
                   else
                     const Center(
                       child: Icon(Icons.videocam_off, color: NvrColors.textSecondary, size: 40),
@@ -222,7 +225,7 @@ class _CameraCard extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              padding: const EdgeInsets.only(left: 12, right: 4, top: 4, bottom: 4),
               child: Row(
                 children: [
                   Expanded(
@@ -247,6 +250,12 @@ class _CameraCard extends StatelessWidget {
                   ),
                   if (camera.isRecording && camera.isOnline)
                     const Icon(Icons.fiber_manual_record, color: NvrColors.offline, size: 14),
+                  IconButton(
+                    tooltip: 'Rekaman',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: onRecordings,
+                    icon: const Icon(Icons.video_library_outlined, size: 20),
+                  ),
                 ],
               ),
             ),

@@ -23,3 +23,7 @@ sqlx = { workspace = true }
 jsonwebtoken = "9"
 reqwest = { version = "0.12", features = ["json"] }
 open-nvr-worker = { path = "../worker" }
+tokio-tungstenite = "0.28"
+futures-util = { version = "0.3", default-features = false, features = ["sink"] }
+sha1 = "0.10"
+base64 = "0.22"

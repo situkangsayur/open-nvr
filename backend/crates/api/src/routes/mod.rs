@@ -12,8 +12,9 @@ mod recording;
 mod recording_files;
 mod timeline;
 mod zones;
-mod ptz;
+pub mod ptz;
 mod layout;
+mod live;
 mod retention;
 mod permissions;
 mod system;
@@ -33,6 +34,7 @@ pub fn create_router(state: AppState) -> Router {
     Router::new()
         .merge(health::routes())
         .merge(ws_routes)
+        .merge(live::public_routes())
         // Everything under /api needs a valid Keycloak token. `/health` stays
         // open so uptime checks keep working without a credential.
         .nest(
@@ -59,6 +61,7 @@ fn api_routes(state: AppState) -> Router {
         .merge(retention::routes(state.clone()))
         .merge(export::routes(state.clone()))
         .merge(hls::routes(state.clone()))
+        .merge(live::routes(state.clone()))
         .merge(permissions::routes(state.clone()))
         .merge(system::routes(state.clone()))
         .merge(user::routes(state.clone()))

@@ -31,10 +31,13 @@ pub async fn security_headers_middleware(
         HeaderName::from_static("cache-control"),
         HeaderValue::from_static("no-store, no-cache, must-revalidate"),
     );
-    headers.insert(
-        HeaderName::from_static("content-security-policy"),
-        HeaderValue::from_static("default-src 'self'; frame-ancestors 'none'"),
-    );
+    // Routes that serve a real page (the live player) set their own policy.
+    if !headers.contains_key("content-security-policy") {
+        headers.insert(
+            HeaderName::from_static("content-security-policy"),
+            HeaderValue::from_static("default-src 'self'; frame-ancestors 'none'"),
+        );
+    }
     headers.insert(
         HeaderName::from_static("referrer-policy"),
         HeaderValue::from_static("strict-origin-when-cross-origin"),

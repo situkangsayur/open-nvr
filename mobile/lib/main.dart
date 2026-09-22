@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'screens/camera_list_screen.dart';
+import 'screens/home_shell.dart';
 import 'screens/login_screen.dart';
 import 'services/api_client.dart';
 import 'services/auth_service.dart';
@@ -43,7 +43,7 @@ class OpenNvrApp extends StatelessWidget {
   }
 }
 
-/// Shows login or the camera list depending on auth state, and rebuilds when
+/// Shows login or the main shell depending on auth state, and rebuilds when
 /// either service changes — so a logout or an expired session lands the user
 /// back on the login screen without any explicit navigation.
 class _Gate extends StatelessWidget {
@@ -60,7 +60,9 @@ class _Gate extends StatelessWidget {
         if (!auth.isAuthenticated) {
           return LoginScreen(servers: servers, auth: auth);
         }
-        return CameraListScreen(
+        // Keyed on the server so switching profile starts from a clean slate.
+        return HomeShell(
+          key: ValueKey(servers.current.apiBase),
           api: ApiClient(servers, auth),
           auth: auth,
           servers: servers,

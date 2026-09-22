@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_nvr_mobile/models/camera.dart';
+import 'package:open_nvr_mobile/models/recording.dart';
 import 'package:open_nvr_mobile/services/server_config.dart';
 import 'package:open_nvr_mobile/theme.dart';
 
@@ -79,6 +80,39 @@ void main() {
       expect(camera.name, 'Tanpa nama');
       expect(camera.status, 'unknown');
       expect(camera.isRecording, isFalse);
+    });
+  });
+
+  group('Recordings', () {
+    test('parses a segment and converts its times to local', () {
+      final f = RecordingFile.fromJson(const {
+        'filename': '20260922_101500.mp4',
+        'start': '2026-09-22T10:15:00Z',
+        'end': '2026-09-22T10:20:00Z',
+        'duration_secs': 300,
+        'size_bytes': 1024,
+        'url': '/api/recordings/files/cam/20260922_101500.mp4',
+      });
+      expect(f.start.isUtc, isFalse);
+      expect(f.start.toUtc(), DateTime.utc(2026, 9, 22, 10, 15));
+      expect(f.duration, const Duration(minutes: 5));
+      expect(f.complete, isTrue, reason: 'older servers omit the flag');
+    });
+
+    test('marks the segment still being written', () {
+      final f = RecordingFile.fromJson(const {
+        'start': '2026-09-22T10:15:00Z',
+        'end': '2026-09-22T10:17:00Z',
+        'url': '/x.mp4',
+        'complete': false,
+      });
+      expect(f.complete, isFalse);
+    });
+
+    test('reads a day as local midnight', () {
+      final d = RecordingDay.fromJson(const {'date': '2026-09-22', 'count': 3, 'size_bytes': 10});
+      expect(d.date, DateTime(2026, 9, 22));
+      expect(d.count, 3);
     });
   });
 

@@ -179,6 +179,38 @@ async fn get_snapshot(
         }
     };
 
+    // go2rtc already holds the stream open, so its keyframe grab is fast and
+    // costs the camera no extra RTSP session.
+    if state.go2rtc.is_some() {
+        let url = format!(
+            "http://{}/api/frame.jpeg?src={}",
+            open_nvr_worker::go2rtc::API_ADDR,
+            camera.id
+        );
+        if let Ok(resp) = reqwest::Client::new()
+            .get(&url)
+            .timeout(std::time::Duration::from_secs(6))
+            .send()
+            .await
+        {
+            if resp.status().is_success() {
+                if let Ok(bytes) = resp.bytes().await {
+                    if !bytes.is_empty() {
+                        return (
+                            StatusCode::OK,
+                            [
+                                (header::CONTENT_TYPE, "image/jpeg"),
+                                (header::CACHE_CONTROL, "no-cache"),
+                            ],
+                            bytes.to_vec(),
+                        )
+                            .into_response();
+                    }
+                }
+            }
+        }
+    }
+
     // For MJPEG cameras, try to fetch a snapshot directly via HTTP first
     if camera.protocol_type.to_string() == "mjpeg" {
         let snapshot_url = camera.stream_url.replace("/video", "/snapshot")

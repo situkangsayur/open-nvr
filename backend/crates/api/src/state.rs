@@ -2,6 +2,7 @@ use open_nvr_application::commands::*;
 use open_nvr_application::queries::*;
 use open_nvr_domain::ports::*;
 use open_nvr_infrastructure::persistence::*;
+use open_nvr_worker::go2rtc::Go2Rtc;
 use open_nvr_worker::hls::HlsStreamManager;
 use open_nvr_worker::manager::CameraManager;
 use open_nvr_worker::recording::LiveFrame;
@@ -25,6 +26,8 @@ pub struct AppState {
     pub permission_repo: Arc<dyn UserPermissionRepository>,
     pub camera_manager: Option<Arc<CameraManager>>,
     pub hls_manager: Option<Arc<HlsStreamManager>>,
+    /// Loopback restreamer; `None` when the binary is not installed.
+    pub go2rtc: Option<Arc<Go2Rtc>>,
     pub db_pool: PgPool,
     pub live_tx: broadcast::Sender<LiveFrame>,
     pub status_tx: broadcast::Sender<String>,
@@ -98,6 +101,10 @@ impl AppState {
         ));
 
         let hls_manager = Some(Arc::new(HlsStreamManager::new("/tmp/opennvr-hls")));
+        let go2rtc = Go2Rtc::from_env(
+            open_nvr_infrastructure::crypto::credentials::CredentialEncryptor::from_env().ok(),
+        )
+        .map(Arc::new);
 
         let (live_tx, _) = broadcast::channel(1024);
         let (status_tx, _) = broadcast::channel(256);
@@ -128,6 +135,7 @@ impl AppState {
             permission_repo: permission_repo as Arc<dyn UserPermissionRepository>,
             camera_manager,
             hls_manager,
+            go2rtc,
             db_pool: pool,
             live_tx,
             status_tx,

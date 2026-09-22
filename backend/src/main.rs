@@ -46,10 +46,16 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // Start background workers
+    // The in-process RTSP recorder uploads to a null store unless object
+    // storage is wired up, so all it did was hold an extra RTSP session per
+    // camera (cheap cameras allow two or three) and add a `recordings` row on
+    // every reconnect. Real recording is the ffmpeg MP4 archive. Opt back in
+    // with LEGACY_RECORDER=1.
+    let legacy_recorder = std::env::var("LEGACY_RECORDER").map(|v| v == "1").unwrap_or(false);
     let state_clone = state.clone();
     tokio::spawn(async move {
         // Start all cameras with recording enabled
-        if let Some(ref mgr) = state_clone.camera_manager {
+        if let (true, Some(ref mgr)) = (legacy_recorder, &state_clone.camera_manager) {
             info!("Starting camera manager - loading cameras...");
             mgr.start_all().await;
             let running = mgr.running_count().await;
@@ -57,38 +63,39 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    // Start HLS streams for online cameras
-    if let Some(ref hls_mgr) = state.hls_manager {
-        let cameras = state.camera_queries.list_cameras().await.unwrap_or_default();
-        let online: Vec<_> = cameras
-            .iter()
-            .filter(|c| c.status == open_nvr_domain::entities::CameraStatus::Online)
-            .cloned()
-            .collect();
-        if !online.is_empty() {
-            let mgr = hls_mgr.clone();
-            tokio::spawn(async move {
-                // Wait for cameras to be fully online
-                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-                mgr.start_all(&online).await;
-                let count = mgr.active_count().await;
-                info!(count = count, "HLS streams started");
-            });
-        }
-    }
-
-    // HLS watchdog: restart dead/hung ffmpeg processes every 30s
-    if let Some(ref hls_mgr) = state.hls_manager {
-        let watchdog_mgr = hls_mgr.clone();
+    // Stream reconcile loop: keeps go2rtc, live HLS and recording running for
+    // every camera in the table. Runs forever rather than once at boot, so a
+    // camera that was offline at startup (or after a reboot) is picked up as
+    // soon as it answers, and a dead process is replaced.
+    {
+        let state = state.clone();
         tokio::spawn(async move {
-            // Wait for initial streams to start
-            tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+            if let Some(ref hls) = state.hls_manager {
+                hls.set_via_go2rtc(state.go2rtc.is_some());
+            }
+            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
             loop {
-                watchdog_mgr.check_and_restart().await;
-                tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                match state.camera_queries.list_cameras().await {
+                    Ok(cameras) => {
+                        let restarted = match state.go2rtc {
+                            Some(ref g) => g.ensure(&cameras).await,
+                            None => false,
+                        };
+                        if let Some(ref hls) = state.hls_manager {
+                            hls.check_and_restart().await;
+                            hls.reconcile(&cameras, restarted).await;
+                        }
+                    }
+                    Err(e) => tracing::warn!(error = %e, "Stream reconcile: cannot load cameras"),
+                }
+                tokio::time::sleep(std::time::Duration::from_secs(15)).await;
             }
         });
     }
+
+    // Find ONVIF PTZ endpoints (and sub streams) for every camera in the
+    // background, so the UI knows which cameras can move.
+    tokio::spawn(open_nvr_api::routes::ptz::discover_all(state.clone()));
 
     // Storage rotation: keep recordings inside the configured disk budget
     // (RECORDINGS_MAX_DISK_PERCENT, default 80%) by deleting oldest segments.

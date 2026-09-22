@@ -1,7 +1,7 @@
 name: open_nvr_mobile
 description: Open-NVR mobile client — live CCTV viewing for the self-hosted NVR.
 publish_to: 'none'
-version: 0.1.0+1
+version: 0.2.0+2
 
 environment:
   sdk: ^3.9.0
@@ -20,6 +20,8 @@ dependencies:
   # HLS playback. On Android this is ExoPlayer, which handles m3u8 natively
   # and is far kinder to the battery than decoding a WebSocket stream in Dart.
   video_player: ^2.9.2
+  webview_flutter: ^4.14.1
+  webview_flutter_android: ^4.14.1
 
 dev_dependencies:
   flutter_test:

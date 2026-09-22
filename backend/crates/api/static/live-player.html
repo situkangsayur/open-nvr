@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Open-NVR live</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  video { width: 100%; height: 100%; object-fit: contain; background: #000; display: block; }
+  #status { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+            color: #888; font: 13px sans-serif; pointer-events: none; text-align: center; padding: 8px; }
+</style>
+</head>
+<body>
+<video id="video" autoplay muted playsinline disablepictureinpicture></video>
+<div id="status"></div>
+<script src="live-player.js"></script>
+</body>
+</html>

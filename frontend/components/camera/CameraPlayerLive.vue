@@ -1,203 +1,173 @@
 <template>
-  <div class="w-full h-full bg-black relative overflow-hidden">
-    <!-- HLS Video (with audio) -->
+  <div class="relative w-full h-full bg-black overflow-hidden select-none">
+    <!-- Live video (MSE). Always rendered: the MediaSource must stay attached. -->
     <video
-      v-show="hlsReady"
       ref="videoEl"
+      muted
       autoplay
       playsinline
-      class="w-full h-full object-contain"
-      @playing="isPlaying = true; loading = false"
-      @stalled="onStall"
-      @error="onHlsError"
+      disablepictureinpicture
+      class="absolute inset-0 w-full h-full"
+      :class="fit === 'cover' ? 'object-cover' : 'object-contain'"
     />
 
-    <!-- Snapshot fallback (while HLS loads or as backup) -->
+    <!-- Snapshot placeholder until the first live frame -->
     <img
-      v-if="!hlsReady && currentSnapshot"
-      :src="currentSnapshot"
-      class="w-full h-full object-contain"
+      v-if="snapshot && !isPlaying"
+      :src="snapshot"
+      alt=""
+      class="absolute inset-0 w-full h-full"
+      :class="fit === 'cover' ? 'object-cover' : 'object-contain'"
     />
 
-    <!-- Loading -->
-    <div v-if="loading && !currentSnapshot" class="absolute inset-0 flex items-center justify-center">
-      <div class="text-gray-500 text-sm animate-pulse">{{ camera.name }}...</div>
+    <!-- Header: status + name -->
+    <div
+      v-if="showName"
+      class="absolute top-0 inset-x-0 flex items-center gap-1.5 bg-gradient-to-b from-black/70 to-transparent pointer-events-none"
+      :class="compact ? 'px-1.5 pt-1 pb-3' : 'px-3 pt-2 pb-5'"
+    >
+      <span class="shrink-0 rounded-full" :class="[dotClass, compact ? 'w-2 h-2' : 'w-2.5 h-2.5']" :title="statusText"></span>
+      <span class="truncate text-white font-medium drop-shadow" :class="compact ? 'text-[11px]' : 'text-sm'">{{ camera.name }}</span>
     </div>
 
-    <!-- Offline -->
-    <div v-if="showOffline" class="absolute inset-0 flex flex-col items-center justify-center p-3 text-center">
-      <div class="text-gray-500 text-sm mb-1">{{ camera.name }}</div>
-      <div class="text-gray-600 text-xs mb-2">{{ errorMsg || 'Offline' }}</div>
-      <button @click="startStream" class="text-xs bg-primary-600 hover:bg-primary-700 text-white px-3 py-1 rounded">Retry</button>
+    <!-- Actions slot (top right), e.g. enlarge -->
+    <div class="absolute top-0 right-0 flex gap-1" :class="compact ? 'p-1' : 'p-2'" @click.stop @dblclick.stop>
+      <slot name="actions" />
     </div>
 
-    <!-- LIVE badge -->
-    <div v-if="isPlaying || currentSnapshot" class="absolute bottom-1.5 right-1.5">
-      <span class="text-[10px] bg-red-600 text-white px-1.5 py-0.5 rounded font-bold">
-        {{ hlsReady ? 'LIVE' : 'SNAP' }}
+    <!-- Connecting indicator -->
+    <div
+      v-if="state === 'connecting' && !isPlaying"
+      class="absolute inset-0 flex items-center justify-center pointer-events-none"
+    >
+      <div class="flex items-center gap-2 bg-black/50 text-gray-200 rounded-full px-3 py-1" :class="compact ? 'text-[10px]' : 'text-xs'">
+        <span class="w-3 h-3 border-2 border-gray-300 border-t-transparent rounded-full animate-spin"></span>
+        {{ error ? 'Reconnecting' : 'Connecting' }}
+      </div>
+    </div>
+
+    <!-- Error / offline placeholder -->
+    <div
+      v-if="showProblem"
+      class="absolute inset-0 flex flex-col items-center justify-center text-center gap-1.5 p-2"
+      :class="snapshot ? 'bg-black/60' : 'bg-gray-900'"
+      @click.stop
+      @dblclick.stop
+    >
+      <div class="text-gray-300 font-medium" :class="compact ? 'text-[11px]' : 'text-sm'">
+        {{ state === 'unsupported' ? 'Not supported' : camera.status === 'offline' ? 'Camera offline' : 'No video' }}
+      </div>
+      <div v-if="error" class="text-gray-400 max-w-xs line-clamp-2" :class="compact ? 'text-[10px]' : 'text-xs'">{{ error }}</div>
+      <button
+        v-if="state !== 'unsupported'"
+        class="mt-1 bg-primary-600 hover:bg-primary-700 text-white rounded"
+        :class="compact ? 'text-[10px] px-2 py-0.5' : 'text-xs px-3 py-1'"
+        @click.stop="retry"
+      >
+        Retry
+      </button>
+    </div>
+
+    <!-- Bottom bar: mute + LIVE -->
+    <div class="absolute bottom-0 inset-x-0 flex items-end justify-between pointer-events-none" :class="compact ? 'p-1' : 'p-2'">
+      <button
+        v-if="isPlaying && hasAudio"
+        class="pointer-events-auto text-white bg-black/50 hover:bg-black/70 rounded transition-colors"
+        :class="compact ? 'text-[10px] px-1.5 py-0.5' : 'text-xs px-2 py-1'"
+        :title="muted ? 'Unmute' : 'Mute'"
+        @click.stop="toggleMute"
+        @dblclick.stop
+      >
+        {{ muted ? 'Sound off' : 'Sound on' }}
+      </button>
+      <span v-else></span>
+      <span
+        v-if="isPlaying"
+        class="bg-red-600 text-white rounded font-bold tracking-wide"
+        :class="compact ? 'text-[9px] px-1 py-px' : 'text-[10px] px-1.5 py-0.5'"
+      >
+        LIVE
       </span>
     </div>
-
-    <!-- Audio toggle (HLS only) -->
-    <button v-if="hlsReady" @click="toggleMute" class="absolute bottom-1.5 left-1.5 text-white bg-black/50 hover:bg-black/70 rounded px-2 py-1 text-xs transition-colors">
-      {{ isMuted ? 'Unmute' : 'Mute' }}
-    </button>
   </div>
 </template>
 
 <script setup lang="ts">
-const props = defineProps<{ camera: any }>()
-const { apiUrl: apiBase } = useServerConfig()
-const { token } = useAuth()
-const { markStarted, isStarted, cacheSnapshot, getCachedSnapshot } = useHlsCache()
+import type { LiveQuality } from '~/composables/useMsePlayer'
 
-/** Header for fetches, and query form for `<video src>`, which cannot set one. */
-const authHeaders = () => (token.value ? { Authorization: `Bearer ${token.value}` } : {})
-const authQuery = (sep: '?' | '&' = '?') =>
-  token.value ? `${sep}access_token=${encodeURIComponent(token.value)}` : ''
+interface LiveCamera {
+  id: string
+  name: string
+  status?: string
+}
+
+const props = withDefaults(
+  defineProps<{
+    camera: LiveCamera
+    quality?: LiveQuality
+    showName?: boolean
+    /** Smaller overlays for dense grids. */
+    compact?: boolean
+    fit?: 'contain' | 'cover'
+  }>(),
+  { quality: 'main', showName: true, compact: false, fit: 'contain' },
+)
 
 const videoEl = ref<HTMLVideoElement | null>(null)
-const currentSnapshot = ref('')
-const loading = ref(false)
-const isPlaying = ref(false)
-const hlsReady = ref(false)
-const isMuted = ref(true)
-const errorMsg = ref('')
+const muted = ref(true)
+const snapshot = ref<string | null>(null)
 
-let snapTimer: ReturnType<typeof setTimeout> | null = null
-let failCount = 0
-
-const showOffline = computed(() => !isPlaying.value && !currentSnapshot.value && !loading.value)
-
-onMounted(() => {
-  // Use cached snapshot immediately (no delay on layout change)
-  const cached = getCachedSnapshot(props.camera.id)
-  if (cached) {
-    currentSnapshot.value = cached
-    isPlaying.value = true
-  }
-
-  if (props.camera.status === 'online') {
-    startStream()
-  } else {
-    errorMsg.value = 'Camera offline'
-  }
+const { state, error, hasAudio, start } = useMsePlayer({
+  video: videoEl,
+  cameraId: () => props.camera.id,
+  quality: () => props.quality,
 })
+const { getCached, fetchSnapshot } = useSnapshotCache()
 
-onUnmounted(() => {
-  clearTimers()
-  // Don't revoke snapshot - keep in cache for layout switches
+const isPlaying = computed(() => state.value === 'playing')
+const showProblem = computed(() => state.value === 'error' || state.value === 'unsupported')
+
+const dotClass = computed(() => {
+  if (isPlaying.value) return 'bg-green-500'
+  if (state.value === 'connecting' || state.value === 'idle') return props.camera.status === 'offline' ? 'bg-red-500' : 'bg-yellow-400'
+  return 'bg-red-500'
 })
+const statusText = computed(() => (isPlaying.value ? 'Live' : state.value === 'error' ? 'Error' : props.camera.status || 'Connecting'))
 
-function clearTimers() {
-  if (snapTimer) { clearTimeout(snapTimer); snapTimer = null }
+const loadSnapshot = async () => {
+  const id = props.camera.id
+  snapshot.value = getCached(id)
+  if (snapshot.value) return
+  const url = await fetchSnapshot(id)
+  // Only useful while live video has not arrived yet.
+  if (url && id === props.camera.id && !isPlaying.value) snapshot.value = url
 }
 
-async function startStream() {
-  loading.value = true
-  errorMsg.value = ''
-  failCount = 0
-
-  // Start snapshot polling immediately (instant feedback)
-  grabSnapshot()
-
-  // Start HLS in parallel (takes ~4s to be ready)
-  startHls()
+const begin = () => {
+  if (videoEl.value) videoEl.value.muted = muted.value
+  start()
+  loadSnapshot()
 }
 
-async function startHls() {
-  const apiUrl = apiBase.value
-  const camId = props.camera.id
+const retry = () => begin()
 
-  try {
-    // Only request start if not already started globally
-    if (!isStarted(camId)) {
-      await fetch(`${apiUrl}/api/hls/${camId}/start`, { method: 'POST', headers: authHeaders() })
-      markStarted(camId)
-    }
-
-    // Poll until playlist is available (max 8 seconds). The token rides in the
-    // query string so the <video> element can fetch playlist and segments too;
-    // the backend copies it onto each segment URI inside the playlist.
-    const playlistUrl = `${apiUrl}/api/hls/${camId}/stream.m3u8${authQuery()}`
-    for (let i = 0; i < 8; i++) {
-      await new Promise(r => setTimeout(r, 1000))
-      try {
-        const resp = await fetch(playlistUrl)
-        if (resp.ok && (await resp.text()).includes('#EXTINF')) {
-          // Playlist ready with segments
-          hlsReady.value = true
-          await nextTick()
-          if (videoEl.value) {
-            videoEl.value.src = playlistUrl
-            videoEl.value.muted = isMuted.value
-            videoEl.value.play().catch(() => {})
-          }
-          // Stop snapshot polling once HLS works
-          clearTimers()
-          return
-        }
-      } catch {}
-    }
-  } catch {}
-
-  // HLS didn't start - snapshot polling continues as fallback
-}
-
-async function grabSnapshot() {
-  try {
-    const url = `${apiBase.value}/api/cameras/${props.camera.id}/snapshot?t=${Date.now()}`
-    const resp = await fetch(url, { headers: authHeaders() })
-    if (resp.ok && resp.headers.get('content-type')?.includes('image')) {
-      const blob = await resp.blob()
-      const objUrl = URL.createObjectURL(blob)
-
-      // Revoke old if it's not the global cache
-      if (currentSnapshot.value && currentSnapshot.value !== getCachedSnapshot(props.camera.id)) {
-        URL.revokeObjectURL(currentSnapshot.value)
-      }
-
-      currentSnapshot.value = objUrl
-      cacheSnapshot(props.camera.id, objUrl)
-      loading.value = false
-      isPlaying.value = true
-      failCount = 0
-
-      // Continue polling if HLS not ready
-      if (!hlsReady.value) {
-        snapTimer = setTimeout(grabSnapshot, 1000)
-      }
-    } else {
-      onSnapFail()
-    }
-  } catch {
-    onSnapFail()
+const toggleMute = () => {
+  muted.value = !muted.value
+  if (videoEl.value) {
+    videoEl.value.muted = muted.value
+    if (!muted.value) videoEl.value.play().catch(() => {})
   }
 }
 
-function onSnapFail() {
-  failCount++
-  if (failCount > 5) {
-    loading.value = false
-    if (!currentSnapshot.value) errorMsg.value = 'Camera unreachable'
-    snapTimer = setTimeout(grabSnapshot, 10000)
-  } else {
-    snapTimer = setTimeout(grabSnapshot, 2000)
-  }
-}
+onMounted(begin)
 
-function onStall() {
-  // HLS stalled, will auto-recover
-}
+watch(
+  () => [props.camera.id, props.quality] as const,
+  ([id], [oldId]) => {
+    if (id !== oldId) snapshot.value = null
+    begin()
+  },
+)
 
-function onHlsError() {
-  hlsReady.value = false
-  // Fall back to snapshot polling
-  if (!snapTimer) grabSnapshot()
-}
-
-function toggleMute() {
-  isMuted.value = !isMuted.value
-  if (videoEl.value) videoEl.value.muted = isMuted.value
-}
+defineExpose({ retry })
 </script>
