@@ -52,6 +52,8 @@ pub struct CameraResponse {
     pub onvif_url: Option<String>,
     pub ptz_capable: bool,
     pub audio_capable: bool,
+    /// Whether a camera login is stored. The login itself is never returned.
+    pub has_credentials: bool,
     pub group_id: Option<Uuid>,
     pub status: String,
     pub connection_type: String,
@@ -114,6 +116,7 @@ impl From<Camera> for CameraResponse {
             onvif_url: c.onvif_url,
             ptz_capable: c.ptz_capable,
             audio_capable: c.audio_capable,
+            has_credentials: c.credentials_encrypted.is_some(),
             group_id: c.group_id,
             status: c.status.to_string(),
             connection_type: c.connection_type.to_string(),

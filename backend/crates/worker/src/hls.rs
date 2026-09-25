@@ -170,7 +170,13 @@ impl HlsStreamManager {
                 "-i", stream_url,
                 "-map", "0:v:0",
                 "-c:v", "copy",
-                "-an",
+                // Record whatever audio the camera sends, if any. Cameras here
+                // publish G.711, which MP4 cannot hold, so it is re-encoded;
+                // "?" keeps video-only cameras recording normally.
+                "-map", "0:a:0?",
+                "-c:a", "aac",
+                "-ac", "1",
+                "-ar", "16000",
                 "-f", "segment",
                 "-segment_time", "300",
                 "-segment_format", "mp4",

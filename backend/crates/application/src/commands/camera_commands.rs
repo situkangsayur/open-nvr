@@ -118,20 +118,37 @@ impl CameraCommandService {
                 .map_err(|e| DomainError::Validation(e))?;
         }
 
-        // Encrypt credentials if provided
-        if let (Some(username), Some(password)) = (&req.username, &req.password) {
-            if let Some(ref encryptor) = self.credential_encryptor {
-                let credential_string = format!("{}:{}", username, password);
-                match encryptor.encrypt(&credential_string) {
-                    Ok(encrypted) => {
-                        camera.credentials_encrypted = Some(encrypted);
-                    }
-                    Err(e) => {
-                        tracing::warn!(error = %e, "Failed to encrypt credentials during update");
+        // Credentials. The camera login is stored as one encrypted
+        // "user:pass" blob, so changing only the password has to keep the
+        // stored username: the UI never sees the password it would resend.
+        let new_user = req.username.filter(|v| !v.is_empty());
+        let new_pass = req.password.filter(|v| !v.is_empty());
+        if new_user.is_some() || new_pass.is_some() {
+            match self.credential_encryptor {
+                Some(ref encryptor) => {
+                    let existing = camera
+                        .credentials_encrypted
+                        .as_ref()
+                        .and_then(|blob| encryptor.decrypt(blob).ok())
+                        .and_then(|creds| {
+                            creds.split_once(':').map(|(u, p)| (u.to_string(), p.to_string()))
+                        });
+                    let (old_user, old_pass) = existing.unwrap_or_default();
+                    let username = new_user.unwrap_or(old_user);
+                    let password = new_pass.unwrap_or(old_pass);
+                    match encryptor.encrypt(&format!("{}:{}", username, password)) {
+                        Ok(encrypted) => camera.credentials_encrypted = Some(encrypted),
+                        Err(e) => {
+                            tracing::warn!(error = %e, "Failed to encrypt camera credentials");
+                        }
                     }
                 }
-            } else {
-                tracing::warn!("Credential encryptor not available, credentials will not be updated");
+                None => {
+                    return Err(DomainError::Validation(
+                        "Server has no CREDENTIAL_ENCRYPTION_KEY, so camera logins cannot be stored"
+                            .into(),
+                    ))
+                }
             }
         }
 

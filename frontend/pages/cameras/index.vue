@@ -50,7 +50,7 @@
       No cameras configured. Add one or use discovery.
     </div>
     <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      <CameraCard v-for="camera in cameras" :key="camera.id" :camera="camera" @delete="deleteCamera" />
+      <CameraCard v-for="camera in cameras" :key="camera.id" :camera="camera" @delete="deleteCamera" @edit="openEdit" />
     </div>
 
     <!-- Add Camera Modal -->
@@ -60,11 +60,11 @@
         <form @submit.prevent="addCamera">
           <div class="space-y-4">
             <div>
-              <label class="block text-sm font-medium text-gray-300 mb-1">Name</label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
               <input v-model="newCamera.name" type="text" required class="w-full bg-gray-100 dark:bg-nvr-darker border border-gray-200 dark:border-nvr-border rounded px-3 py-2 text-gray-900 dark:text-white" />
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-300 mb-1">Protocol</label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Protocol</label>
               <select v-model="newCamera.protocol_type" class="w-full bg-gray-100 dark:bg-nvr-darker border border-gray-200 dark:border-nvr-border rounded px-3 py-2 text-gray-900 dark:text-white">
                 <option value="rtsp">RTSP</option>
                 <option value="onvif">ONVIF</option>
@@ -73,26 +73,26 @@
               </select>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-300 mb-1">Stream URL</label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Stream URL</label>
               <input v-model="newCamera.stream_url" type="text" required placeholder="rtsp://..." class="w-full bg-gray-100 dark:bg-nvr-darker border border-gray-200 dark:border-nvr-border rounded px-3 py-2 text-gray-900 dark:text-white" />
             </div>
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1">Username</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Username</label>
                 <input v-model="newCamera.username" type="text" class="w-full bg-gray-100 dark:bg-nvr-darker border border-gray-200 dark:border-nvr-border rounded px-3 py-2 text-gray-900 dark:text-white" />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1">Password</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
                 <input v-model="newCamera.password" type="password" class="w-full bg-gray-100 dark:bg-nvr-darker border border-gray-200 dark:border-nvr-border rounded px-3 py-2 text-gray-900 dark:text-white" />
               </div>
             </div>
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1">Brand</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Brand</label>
                 <input v-model="newCamera.brand" type="text" class="w-full bg-gray-100 dark:bg-nvr-darker border border-gray-200 dark:border-nvr-border rounded px-3 py-2 text-gray-900 dark:text-white" />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1">Connection</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Connection</label>
                 <select v-model="newCamera.connection_type" class="w-full bg-gray-100 dark:bg-nvr-darker border border-gray-200 dark:border-nvr-border rounded px-3 py-2 text-gray-900 dark:text-white">
                   <option value="ethernet">Ethernet</option>
                   <option value="wifi">WiFi</option>
@@ -107,6 +107,14 @@
         </form>
       </div>
     </div>
+
+    <!-- Edit Camera Modal -->
+    <CameraEditModal
+      :open="!!editingId"
+      :camera-id="editingId"
+      @close="editingId = null"
+      @saved="loadCameras"
+    />
   </div>
 </template>
 
@@ -123,6 +131,9 @@ const newCamera = ref({
   brand: '',
   connection_type: 'ethernet',
 })
+
+const editingId = ref<string | null>(null)
+const openEdit = (id: string) => { editingId.value = id }
 
 const quickIp = ref('')
 const quickName = ref('')

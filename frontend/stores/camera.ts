@@ -11,6 +11,7 @@ interface Camera {
   onvif_url: string | null
   ptz_capable: boolean
   audio_capable: boolean
+  has_credentials: boolean
   group_id: string | null
   status: string
   connection_type: string

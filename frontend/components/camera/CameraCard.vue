@@ -23,8 +23,9 @@
       <div v-if="testStatus" class="mt-2 text-xs p-1.5 rounded" :class="testStatus.ok ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'">
         {{ testStatus.message }}
       </div>
-      <div class="flex justify-end gap-2 mt-3">
-        <NuxtLink :to="`/cameras/${camera.id}`" class="text-xs text-primary-400 hover:underline">Edit</NuxtLink>
+      <div class="flex flex-wrap justify-end gap-2 mt-3">
+        <NuxtLink :to="`/cameras/${camera.id}`" class="text-xs text-primary-400 hover:underline">Details</NuxtLink>
+        <button @click="$emit('edit', camera.id)" class="text-xs text-primary-400 hover:underline">Edit</button>
         <button @click="testCamera" :disabled="testingCamera" class="text-xs text-green-400 hover:underline">
           {{ testingCamera ? 'Testing...' : 'Test' }}
         </button>
@@ -39,7 +40,7 @@
 
 <script setup lang="ts">
 const props = defineProps<{ camera: any }>()
-defineEmits<{ delete: [id: string] }>()
+defineEmits<{ delete: [id: string]; edit: [id: string] }>()
 
 const testingCamera = ref(false)
 const testStatus = ref<{ ok: boolean; message: string } | null>(null)
