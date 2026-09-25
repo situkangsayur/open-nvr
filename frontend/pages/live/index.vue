@@ -84,6 +84,20 @@
           >
             <CameraPlayerLive :camera="camera" :quality="tileQuality" :compact="cols >= 3">
               <template #actions>
+                <!-- A camera that can move says so on its own tile: the
+                     floating panel alone left people hunting for it. -->
+                <button
+                  v-if="camera.ptz_capable"
+                  class="text-white rounded leading-none font-medium"
+                  :class="[
+                    cols >= 3 ? 'text-[11px] px-1.5 py-1' : 'text-xs px-2 py-1.5',
+                    selectedId === camera.id && showPtz ? 'bg-primary-600' : 'bg-black/50 hover:bg-black/80',
+                  ]"
+                  title="Move this camera"
+                  @click.stop="openPtz(camera.id)"
+                >
+                  PTZ
+                </button>
                 <button
                   class="text-white bg-black/50 hover:bg-black/80 rounded leading-none"
                   :class="cols >= 3 ? 'text-[11px] px-1.5 py-1' : 'text-xs px-2 py-1.5'"
@@ -212,6 +226,17 @@ watch(pageCount, (n) => {
 const singleId = computed(() => (typeof route.query.camera === 'string' ? route.query.camera : null))
 const singleCamera = computed(() => (singleId.value ? cameras.value.find((c) => c.id === singleId.value) ?? null : null))
 const selectedCamera = computed(() => cameras.value.find((c) => c.id === selectedId.value) ?? null)
+
+/** Select a tile and show its PTZ pad, or hide the pad if it is already that
+ *  camera's. Tapping PTZ on a tile should need no second step. */
+const openPtz = (id: string) => {
+  if (selectedId.value === id && showPtz.value) {
+    showPtz.value = false
+    return
+  }
+  selectedId.value = id
+  showPtz.value = true
+}
 
 const enterSingle = (id: string) => {
   selectedId.value = id
